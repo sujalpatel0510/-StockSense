@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   Boxes,
   Lock,
@@ -15,6 +16,10 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  Activity,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -127,96 +132,114 @@ export const AuthModal: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full flex bg-bg-primary">
-      {/* LEFT COLUMN: Enterprise Showcase (Visible on lg screens) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-brand-primary via-brand-primary-hover to-brand-primary p-12 flex-col justify-between border-r border-border-subtle relative overflow-hidden">
+      {/* LEFT COLUMN: Clean, Simple & Friendly Warehouse Showcase */}
+      <div className="hidden lg:flex lg:w-1/2 relative p-8 xl:p-12 flex-col justify-between overflow-hidden bg-slate-900 text-white">
+        {/* Real General Warehouse Photography Background */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80"
+            alt="Modern Warehouse & Stock"
+            className="w-full h-full object-cover object-center brightness-90 filter"
+          />
+          {/* Soft Dark Gradient Overlay for Maximum Legibility */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/50" />
+        </div>
+
         {/* Brand Header */}
-        <div className="relative z-10">
+        <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 p-2 flex items-center justify-center shadow-lg shadow-black/10 border border-white/20 backdrop-blur-sm">
-              <Boxes className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/40 text-white">
+              <Boxes className="w-5 h-5" />
             </div>
             <div>
               <span className="font-extrabold text-xl tracking-tight text-white flex items-center gap-2">
                 StockSense
-                <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-mono font-semibold border border-white/30">
-                  Enterprise IMS
+                <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold backdrop-blur-xs">
+                  Inventory
                 </span>
               </span>
-              <p className="text-xs text-white/70">Modular Real-Time Inventory Management System</p>
+              <p className="text-xs text-slate-300">Simple & Reliable Stock Management</p>
             </div>
           </div>
         </div>
 
-        {/* Main Value Proposition */}
+        {/* Center Content: Simple, Clear & Helpful */}
         <div className="relative z-10 space-y-6 my-auto max-w-lg">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs text-white font-medium backdrop-blur-sm">
-            <Sparkles className="w-3.5 h-3.5 text-white/90" />
-            <span>Double-Entry Inventory Accounting Architecture</span>
+          {/* Friendly pill badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-medium text-white shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Smart Warehouse & Stock System</span>
           </div>
 
-          <h1 className="text-3xl xl:text-4xl font-black text-white tracking-tight leading-tight">
-            Enterprise stock operations, <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">
-              engineered with precision.
-            </span>
+          <h1 className="text-3xl xl:text-4xl font-extrabold text-white tracking-tight leading-tight">
+            Simple, real-time inventory <br />
+            for modern businesses.
           </h1>
 
-          <p className="text-body text-white/70 leading-relaxed">
-            Eliminate phantom inventory and spreadsheet errors. Track raw material receipts, internal manufacturing transfers, and customer dispatches with mathematically immutable ledger moves.
+          <p className="text-base text-slate-200/90 leading-relaxed">
+            Keep full control of your stock. Track incoming shipments, customer deliveries, and warehouse transfers without confusing spreadsheets.
           </p>
 
-          {/* Feature Highlights Grid */}
-          <div className="grid grid-cols-2 gap-3.5 pt-2">
-            <div className="p-3.5 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-white font-semibold text-xs">
-                <Shield className="w-4 h-4 text-white/90" />
-                <span>Zero Inventory Drift</span>
+          {/* Simple 2-column feature cards */}
+          <div className="grid grid-cols-2 gap-3.5 pt-1">
+            <div className="p-4 rounded-2xl bg-slate-900/75 border border-white/15 backdrop-blur-md shadow-lg">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-2.5">
+                <CheckCircle2 className="w-4 h-4" />
               </div>
-              <p className="text-[11px] text-white/60 mt-1">
-                Atomic PostgreSQL transactions with complete debit-credit location pairing.
+              <h3 className="text-sm font-bold text-white">Accurate Stock Counts</h3>
+              <p className="text-xs text-slate-300 mt-1 leading-normal">
+                Always know what items you have and where they are stored.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-white font-semibold text-xs">
-                <Zap className="w-4 h-4 text-white/90" />
-                <span>Automated Reorders</span>
+            <div className="p-4 rounded-2xl bg-slate-900/75 border border-white/15 backdrop-blur-md shadow-lg">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center mb-2.5">
+                <Zap className="w-4 h-4" />
               </div>
-              <p className="text-[11px] text-white/60 mt-1">
-                Real-time safety stock monitoring with proactive supplier replenishment triggers.
+              <h3 className="text-sm font-bold text-white">Low Stock Alerts</h3>
+              <p className="text-xs text-slate-300 mt-1 leading-normal">
+                Get notified automatically before critical inventory runs out.
               </p>
             </div>
           </div>
 
-          {/* Live Activity Simulation Feed */}
-          <div className="p-4 rounded-xl bg-black/30 border border-white/10 text-xs space-y-2.5 backdrop-blur-sm">
-            <div className="flex items-center justify-between text-[11px] font-bold text-white/50 uppercase tracking-wider">
-              <span>Live Stock Ledger Activity</span>
-              <span className="text-emerald-400 flex items-center gap-1 font-mono text-[10px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sync Active
-              </span>
+          {/* Friendly Customer / Warehouse Stats Banner */}
+          <div className="p-3.5 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                <img
+                  className="inline-block h-7 w-7 rounded-full ring-2 ring-white/50 object-cover"
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
+                  alt="User avatar"
+                />
+                <img
+                  className="inline-block h-7 w-7 rounded-full ring-2 ring-white/50 object-cover"
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80"
+                  alt="User avatar"
+                />
+                <img
+                  className="inline-block h-7 w-7 rounded-full ring-2 ring-white/50 object-cover"
+                  src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=100&q=80"
+                  alt="User avatar"
+                />
+              </div>
+              <div className="text-xs">
+                <p className="font-bold text-white">Trusted by Warehouse Teams</p>
+                <p className="text-slate-300 text-[11px]">Real-time collaboration across staff & managers</p>
+              </div>
             </div>
-            <div className="space-y-1.5 font-mono text-[11px]">
-              <div className="flex items-center justify-between text-white/80">
-                <span>WH/IN/0001 · Tata Steel</span>
-                <span className="text-emerald-400 font-bold">+100 kg</span>
-              </div>
-              <div className="flex items-center justify-between text-white/80">
-                <span>WH/OUT/0001 · Metro Workspaces</span>
-                <span className="text-amber-400 font-bold">-10 Chairs</span>
-              </div>
-              <div className="flex items-center justify-between text-white/80">
-                <span>WH/INT/0001 · WH1 → WH2</span>
-                <span className="text-purple-400 font-bold">25 Units</span>
-              </div>
+            <div className="text-right pl-2">
+              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                99.9% Uptime
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Footer info */}
-        <div className="relative z-10 flex items-center justify-between text-xs text-white/40 pt-6 border-t border-white/10">
-          <span>StockSense Platform v1.0</span>
-          <span>PostgreSQL 16/17 • Prisma ORM</span>
+        {/* Simple Footer */}
+        <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 pt-4 border-t border-white/15">
+          <span>StockSense Platform</span>
+          <span>Fast, Reliable & Simple</span>
         </div>
       </div>
 
