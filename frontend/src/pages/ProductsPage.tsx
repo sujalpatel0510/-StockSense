@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Package,
   Plus,
@@ -29,9 +29,12 @@ import { EmptyState } from '../components/ui';
 import { Button, Input, Select } from '../components/ui';
 import { Drawer } from '../components/ui';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 
 export const ProductsPage: React.FC = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { 
     products, 
     categories, 
@@ -68,6 +71,33 @@ export const ProductsPage: React.FC = () => {
     locations.find((l) => l.type === 'INTERNAL')?.id || ''
   );
   const [description, setDescription] = useState('');
+
+  // Handle URL query parameters (?status=LOW_STOCK, ?new=true)
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setStatusFilter(statusParam);
+    }
+    if (searchParams.get('new') === 'true') {
+      setIsCreateDrawerOpen(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams]);
+
+  // Ensure category and location are populated once loaded
+  useEffect(() => {
+    if (!categoryId && categories.length > 0) {
+      setCategoryId(categories[0].id);
+    }
+  }, [categories, categoryId]);
+
+  useEffect(() => {
+    if (!initialLocationId && locations.length > 0) {
+      const internalLoc = locations.find((l) => l.type === 'INTERNAL')?.id || locations[0]?.id;
+      if (internalLoc) setInitialLocationId(internalLoc);
+    }
+  }, [locations, initialLocationId]);
 
   const [loading, setLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -201,6 +231,37 @@ export const ProductsPage: React.FC = () => {
           Add New Product
         </Button>
       </div>
+
+      {/* Role Feature Specification Banner */}
+      {user?.role === 'WAREHOUSE_STAFF' ? (
+        <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded-lg bg-amber-200/80 text-amber-900 font-mono font-black text-micro tracking-wide border border-amber-300 shrink-0">
+              WAREHOUSE STAFF ROLE
+            </span>
+            <div className="text-xs">
+              <span className="font-bold">Staff Operational View:</span> Checking stock availability per location rack/bin, SKU codes, and barcodes for picking and shelving. Master product creation & reordering limits are maintained by <strong>Inventory Managers</strong>.
+            </div>
+          </div>
+          <span className="text-[11px] font-mono font-bold bg-white px-2 py-0.5 rounded text-amber-800 border border-amber-200 shrink-0">
+            Picking & Shelving Mode
+          </span>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-indigo-50/90 border border-indigo-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-900 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-200/80 text-indigo-900 font-mono font-black text-micro tracking-wide border border-indigo-300 shrink-0">
+              INVENTORY MANAGER ROLE
+            </span>
+            <div className="text-xs">
+              <span className="font-bold">Manager Master Data View:</span> Full control to create/update products, configure Min/Max reordering limits (safety stock rules), edit unit purchase/selling prices, and analyze margin valuations.
+            </div>
+          </div>
+          <span className="text-[11px] font-mono font-bold bg-white px-2 py-0.5 rounded text-indigo-800 border border-indigo-200 shrink-0">
+            Master Data & Rules Mode
+          </span>
+        </div>
+      )}
 
       {/* Asset KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

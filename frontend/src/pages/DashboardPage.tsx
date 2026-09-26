@@ -64,62 +64,9 @@ export const DashboardPage: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  if (!dashboardStats) {
-    return (
-      <div className="flex items-center justify-center min-h-[450px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-brand-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-body text-text-muted">Loading Enterprise Stock Assets...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { kpis, operationsSummary, categoryStats, recentMoves } = dashboardStats;
-
-  // Financial Stock Portfolio Calculations
-  const totalCostValuation = products.reduce((acc, p) => acc + (p.totalOnHand * p.costPrice), 0);
-  const totalSaleValuation = products.reduce((acc, p) => acc + (p.totalOnHand * p.salePrice), 0);
-  const totalMargin = totalSaleValuation > 0 ? Math.round(((totalSaleValuation - totalCostValuation) / totalSaleValuation) * 100) : 0;
-  const inStockPercentage = kpis.totalProductsCount > 0
-    ? Math.round(((kpis.totalProductsCount - (kpis.lowStockCount + kpis.outOfStockCount)) / kpis.totalProductsCount) * 100)
-    : 100;
-
-  const currentLowStock = products.filter((p) => p.stockStatus === 'LOW_STOCK').length;
-  const currentOutOfStock = products.filter((p) => p.stockStatus === 'OUT_OF_STOCK').length;
-  const totalCriticalWatchlist = currentLowStock + currentOutOfStock;
-
-  const handleOpenNewTransfer = (type: 'RECEIPT' | 'DELIVERY' | 'INTERNAL') => {
-    const routes = {
-      RECEIPT: '/transfers/receipts',
-      DELIVERY: '/transfers/deliveries',
-      INTERNAL: '/transfers/internal',
-    };
-    navigate(routes[type]);
-  };
-
-  const handleOpenNewAdjustment = () => {
-    navigate('/adjustments');
-  };
-
-  // Direct Validation from Dashboard for Ready Transfers
-  const handleQuickValidate = async (transferId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActionLoadingId(transferId);
-    setActionFeedback(null);
-    try {
-      const res = await api.validateTransfer(transferId);
-      setActionFeedback({ type: 'success', message: res.message || 'Transfer validated successfully and inventory updated!' });
-      await fetchAllData();
-    } catch (err: any) {
-      setActionFeedback({ type: 'error', message: err.message || 'Failed to validate transfer.' });
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  // Dynamic Filtering of Operations Feed
+  // Dynamic Filtering of Operations Feed (Hook must be declared before any conditional return!)
   const filteredOperations = useMemo(() => {
+    if (!Array.isArray(transfers)) return [];
     return transfers.filter((t) => {
       // 1. Filter by Document Type
       if (filterDocType !== 'ALL' && t.type !== filterDocType) {
@@ -146,7 +93,7 @@ export const DashboardPage: React.FC = () => {
       // 5. Search Text
       if (filterSearch.trim()) {
         const query = filterSearch.toLowerCase();
-        const matchesRef = t.reference.toLowerCase().includes(query);
+        const matchesRef = (t.reference || '').toLowerCase().includes(query);
         const matchesPartner = (t.partnerName || '').toLowerCase().includes(query);
         const matchesProduct = t.lines?.some((l) => (l.product?.name || '').toLowerCase().includes(query));
         if (!matchesRef && !matchesPartner && !matchesProduct) return false;
@@ -154,6 +101,78 @@ export const DashboardPage: React.FC = () => {
       return true;
     });
   }, [transfers, filterDocType, filterStatus, filterLocation, filterCategory, filterSearch, products]);
+
+  if (!dashboardStats) {
+    return (
+      <div className="flex items-center justify-center min-h-[450px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-brand-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-body text-text-muted">Loading Enterprise Stock Assets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const kpis = dashboardStats?.kpis || {
+    totalProductsCount: 0,
+    totalItemsInStock: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+    pendingReceipts: 0,
+    pendingDeliveries: 0,
+    internalScheduled: 0,
+  };
+
+  const operationsSummary = dashboardStats?.operationsSummary || {
+    receipts: { toProcess: 0, total: 0 },
+    deliveries: { toProcess: 0, total: 0 },
+    internal: { toProcess: 0, total: 0 },
+    adjustments: { total: 0 },
+  };
+
+  const categoryStats = Array.isArray(dashboardStats?.categoryStats) ? dashboardStats.categoryStats : [];
+  const recentMoves = Array.isArray(dashboardStats?.recentMoves) ? dashboardStats.recentMoves : [];
+
+  // Financial Stock Portfolio Calculations
+  const totalCostValuation = (products || []).reduce((acc, p) => acc + ((p.totalOnHand || 0) * (p.costPrice || 0)), 0);
+  const totalSaleValuation = (products || []).reduce((acc, p) => acc + ((p.totalOnHand || 0) * (p.salePrice || 0)), 0);
+  const totalMargin = totalSaleValuation > 0 ? Math.round(((totalSaleValuation - totalCostValuation) / totalSaleValuation) * 100) : 0;
+  const inStockPercentage = (kpis.totalProductsCount || 0) > 0
+    ? Math.round((((kpis.totalProductsCount || 0) - ((kpis.lowStockCount || 0) + (kpis.outOfStockCount || 0))) / (kpis.totalProductsCount || 1)) * 100)
+    : 100;
+
+  const currentLowStock = (products || []).filter((p) => p.stockStatus === 'LOW_STOCK').length;
+  const currentOutOfStock = (products || []).filter((p) => p.stockStatus === 'OUT_OF_STOCK').length;
+  const totalCriticalWatchlist = currentLowStock + currentOutOfStock;
+
+  const handleOpenNewTransfer = (type: 'RECEIPT' | 'DELIVERY' | 'INTERNAL') => {
+    const routes = {
+      RECEIPT: '/transfers/receipts?new=true',
+      DELIVERY: '/transfers/deliveries?new=true',
+      INTERNAL: '/transfers/internal?new=true',
+    };
+    navigate(routes[type], { state: { openNew: true } });
+  };
+
+  const handleOpenNewAdjustment = () => {
+    navigate('/adjustments');
+  };
+
+  // Direct Validation from Dashboard for Ready Transfers
+  const handleQuickValidate = async (transferId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActionLoadingId(transferId);
+    setActionFeedback(null);
+    try {
+      const res = await api.validateTransfer(transferId);
+      setActionFeedback({ type: 'success', message: res.message || 'Transfer validated successfully and inventory updated!' });
+      await fetchAllData();
+    } catch (err: any) {
+      setActionFeedback({ type: 'error', message: err.message || 'Failed to validate transfer.' });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   const resetDynamicFilters = () => {
     setFilterDocType('ALL');
@@ -504,12 +523,12 @@ export const DashboardPage: React.FC = () => {
                         {op.partnerName || '—'}
                       </td>
                       <td className="py-3 px-3 text-text-secondary">
-                        <span className="font-medium">{op.sourceLocation.name}</span>
+                        <span className="font-medium">{op.sourceLocation?.name || 'Vendor / Source'}</span>
                         <span className="mx-1 text-text-muted">→</span>
-                        <span className="font-semibold text-emerald-700">{op.destLocation.name}</span>
+                        <span className="font-semibold text-emerald-700">{op.destLocation?.name || 'Customer / Dest'}</span>
                       </td>
                       <td className="py-3 px-3 text-text-muted font-mono text-micro">
-                        {new Date(op.scheduledDate).toLocaleDateString()}
+                        {op.scheduledDate ? new Date(op.scheduledDate).toLocaleDateString() : '—'}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <StatusBadge status={op.status} />
@@ -673,29 +692,35 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {categoryStats.map((cat, idx) => {
-              const maxQty = Math.max(...categoryStats.map((c) => c.totalQty), 1);
-              const percentage = Math.round((cat.totalQty / maxQty) * 100);
+            {categoryStats.length === 0 ? (
+              <div className="py-8 text-center text-text-muted text-caption">
+                No category data available.
+              </div>
+            ) : (
+              categoryStats.map((cat, idx) => {
+                const maxQty = Math.max(...categoryStats.map((c) => c.totalQty || 0), 1);
+                const percentage = Math.min(100, Math.round(((cat.totalQty || 0) / maxQty) * 100));
 
-              return (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-caption font-medium">
-                    <span className="text-text-primary font-semibold">{cat.category}</span>
-                    <span className="text-text-secondary font-mono font-bold">
-                      {cat.totalQty.toLocaleString()} units{' '}
-                      <span className="text-text-muted font-normal">({cat.productCount} SKUs)</span>
-                    </span>
-                  </div>
+                return (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-caption font-medium">
+                      <span className="text-text-primary font-semibold">{cat.category}</span>
+                      <span className="text-text-secondary font-mono font-bold">
+                        {(cat.totalQty || 0).toLocaleString()} units{' '}
+                        <span className="text-text-muted font-normal">({cat.productCount || 0} SKUs)</span>
+                      </span>
+                    </div>
 
-                  <div className="w-full bg-bg-elevated rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-brand-primary h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    />
+                    <div className="w-full bg-bg-elevated rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-brand-primary h-full rounded-full transition-all duration-500"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           <div className="pt-4 border-t border-border-subtle text-center">
@@ -738,20 +763,20 @@ export const DashboardPage: React.FC = () => {
                   {recentMoves.map((move: any) => (
                     <tr key={move.id} className="hover:bg-bg-elevated/50 transition-colors">
                       <td className="py-3 text-text-muted font-mono text-micro">
-                        {new Date(move.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {move.createdAt ? new Date(move.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
                       </td>
-                      <td className="py-3 font-mono font-bold text-brand-primary">{move.reference}</td>
+                      <td className="py-3 font-mono font-bold text-brand-primary">{move.reference || '—'}</td>
                       <td className="py-3">
-                        <div className="font-semibold text-text-primary">{move.product.name}</div>
-                        <div className="text-micro text-text-muted font-mono">{move.product.sku}</div>
+                        <div className="font-semibold text-text-primary">{move.product?.name || 'Stock Item'}</div>
+                        <div className="text-micro text-text-muted font-mono">{move.product?.sku || '—'}</div>
                       </td>
                       <td className="py-3 text-text-secondary">
-                        <span className="font-medium text-text-secondary">{move.sourceLocation.name}</span>
+                        <span className="font-medium text-text-secondary">{move.sourceLocation?.name || 'Vendor / Source'}</span>
                         <span className="mx-1.5 text-text-muted font-bold">→</span>
-                        <span className="font-semibold text-emerald-700">{move.destLocation.name}</span>
+                        <span className="font-semibold text-emerald-700">{move.destLocation?.name || 'Customer / Dest'}</span>
                       </td>
                       <td className="py-3 text-right font-mono font-bold text-text-primary">
-                        +{move.quantity} {move.uom || move.product.uom}
+                        +{move.quantity} {move.uom || move.product?.uom || 'units'}
                       </td>
                       <td className="py-3 text-center">
                         <StatusBadge status={move.status} />

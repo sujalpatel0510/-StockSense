@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -38,6 +38,8 @@ interface TransfersPageProps {
 export const TransfersPage: React.FC<TransfersPageProps> = ({ type }) => {
   const navigate = useNavigate();
   const params = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const { 
     transfers: allTransfers, 
     products, 
@@ -75,6 +77,43 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ type }) => {
       uom: products[0]?.uom || 'Units',
     },
   ]);
+
+  // Open creation drawer if URL has ?new=true or navigation state has openNew
+  useEffect(() => {
+    if (searchParams.get('new') === 'true' || (location.state as any)?.openNew) {
+      setIsCreating(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, location.state]);
+
+  // Ensure valid default locations once loaded
+  useEffect(() => {
+    if (!sourceLocationId && locations.length > 0) {
+      const src = type === 'RECEIPT'
+        ? locations.find((l) => l.type === 'VENDOR')?.id || locations[0]?.id
+        : locations.find((l) => l.type === 'INTERNAL')?.id || locations[0]?.id;
+      if (src) setSourceLocationId(src);
+    }
+    if (!destLocationId && locations.length > 0) {
+      const dest = type === 'DELIVERY'
+        ? locations.find((l) => l.type === 'CUSTOMER')?.id || locations[0]?.id
+        : locations.find((l) => l.type === 'INTERNAL')?.id || locations[0]?.id;
+      if (dest) setDestLocationId(dest);
+    }
+  }, [locations, type, sourceLocationId, destLocationId]);
+
+  // Ensure first line product is set once products are loaded
+  useEffect(() => {
+    if (products.length > 0 && lines.length === 1 && !lines[0].productId) {
+      setLines([{
+        productId: products[0].id,
+        demandQty: 10,
+        doneQty: 0,
+        uom: products[0].uom || 'Units',
+      }]);
+    }
+  }, [products]);
 
   const [doneUpdates, setDoneUpdates] = useState<Record<string, number>>({});
   const [actionLoading, setActionLoading] = useState(false);

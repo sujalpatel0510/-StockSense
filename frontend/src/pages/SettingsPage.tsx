@@ -17,8 +17,10 @@ import api from '../services/api';
 import { Button, Input, Textarea, Select, Card, Badge } from '../components/ui';
 import { Drawer } from '../components/ui';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 
 export const SettingsPage: React.FC = () => {
+  const { user } = useAuth();
   const { warehouses, locations, refreshWarehouses, refreshLocations } = useData();
   const [activeSubTab, setActiveSubTab] = useState<'warehouses' | 'locations'>('warehouses');
 
@@ -128,6 +130,37 @@ export const SettingsPage: React.FC = () => {
           </button>
         </div>
       </Card>
+
+      {/* Role Feature Guidance Banner */}
+      {user?.role === 'WAREHOUSE_STAFF' ? (
+        <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded-lg bg-amber-200/80 text-amber-900 font-mono font-black text-micro tracking-wide border border-amber-300 shrink-0">
+              WAREHOUSE STAFF ROLE
+            </span>
+            <div className="text-xs">
+              <span className="font-bold">Facility Reference View:</span> Inspecting warehouse structures and bin locations for shelving operations. Warehouse provisioning and location configuration are managed by <strong>Inventory Managers</strong>.
+            </div>
+          </div>
+          <span className="text-[11px] font-mono font-bold bg-white px-2 py-0.5 rounded text-amber-800 border border-amber-200 shrink-0">
+            View-Only Facility Hierarchy
+          </span>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-indigo-50/90 border border-indigo-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-900 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded-lg bg-indigo-200/80 text-indigo-900 font-mono font-black text-micro tracking-wide border border-indigo-300 shrink-0">
+              INVENTORY MANAGER ROLE
+            </span>
+            <div className="text-xs">
+              <span className="font-bold">Enterprise Architecture Management:</span> Full permissions to define multi-warehouse facilities, internal production racks, dock locations, and scrap loss accounts.
+            </div>
+          </div>
+          <span className="text-[11px] font-mono font-bold bg-white px-2 py-0.5 rounded text-indigo-800 border border-indigo-200 shrink-0">
+            Full Facility Config
+          </span>
+        </div>
+      )}
 
       {feedback && (
         <div

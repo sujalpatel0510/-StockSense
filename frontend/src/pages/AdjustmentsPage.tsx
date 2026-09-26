@@ -78,7 +78,10 @@ export const AdjustmentsPage: React.FC = () => {
             <Scale className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-h2 font-extrabold text-text-primary tracking-tight">Physical Inventory Adjustments</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-h2 font-extrabold text-text-primary tracking-tight">Physical Inventory Adjustments</h1>
+              <Badge variant="purple" size="sm">Staff & Manager Count Tool</Badge>
+            </div>
             <p className="text-caption text-text-muted mt-0.5">
               Reconcile physical stock counts with recorded book inventory. Discrepancies are logged directly in the Stock Ledger.
             </p>
