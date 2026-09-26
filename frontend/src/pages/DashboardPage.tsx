@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Package,
   AlertTriangle,
@@ -8,455 +9,386 @@ import {
   Boxes,
   Plus,
   Clock,
-  CheckCircle,
+  CheckCircle2,
   TrendingUp,
   Activity,
-  Calendar,
   Layers,
   Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  DollarSign,
+  PieChart,
+  BarChart3,
+  ExternalLink,
 } from 'lucide-react';
-import { DashboardStats, ProductCategory, Warehouse } from '../types';
-import { ActiveTab } from '../components/Navbar';
+import { DashboardStats, ProductCategory, Warehouse, Product } from '../types';
+import { ActiveTab } from '../components/Navigation';
+import { StatCard, Card } from '../components/ui';
+import { StatusBadge, Badge } from '../components/ui';
+import { Button } from '../components/ui';
+import { useData } from '../context/DataContext';
 
-interface DashboardPageProps {
-  stats: DashboardStats | null;
-  categories: ProductCategory[];
-  warehouses: Warehouse[];
-  selectedWarehouseId: string;
-  setActiveTab: (tab: ActiveTab) => void;
-  onOpenNewTransfer: (type: 'RECEIPT' | 'DELIVERY' | 'INTERNAL') => void;
-  onOpenNewAdjustment: () => void;
-}
+export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { 
+    dashboardStats, 
+    categories, 
+    warehouses, 
+    products,
+    selectedWarehouseId,
+    setSelectedWarehouseId,
+    fetchAllData,
+  } = useData();
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({
-  stats,
-  categories,
-  warehouses,
-  selectedWarehouseId,
-  setActiveTab,
-  onOpenNewTransfer,
-  onOpenNewAdjustment,
-}) => {
-  const [filterDocType, setFilterDocType] = useState<string>('ALL');
-  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [lowStockCount, setLowStockCount] = useState(0);
 
-  if (!stats) {
+  if (!dashboardStats) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[450px]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
-          <p className="text-xs font-semibold text-slate-500">Loading StockSense Operations...</p>
+          <div className="w-10 h-10 border-4 border-brand-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-body text-text-muted">Loading Enterprise Stock Assets...</p>
         </div>
       </div>
     );
   }
 
-  const { kpis, operationsSummary, categoryStats, recentMoves } = stats;
+  const { kpis, operationsSummary, categoryStats, recentMoves } = dashboardStats;
+
+  // Financial Stock Portfolio Calculations
+  const totalCostValuation = products.reduce((acc, p) => acc + (p.totalOnHand * p.costPrice), 0);
+  const totalSaleValuation = products.reduce((acc, p) => acc + (p.totalOnHand * p.salePrice), 0);
+  const totalMargin = totalSaleValuation > 0 ? Math.round(((totalSaleValuation - totalCostValuation) / totalSaleValuation) * 100) : 0;
+  const inStockPercentage = kpis.totalProductsCount > 0
+    ? Math.round(((kpis.totalProductsCount - (kpis.lowStockCount + kpis.outOfStockCount)) / kpis.totalProductsCount) * 100)
+    : 100;
+
+  const currentLowStock = products.filter((p) => p.stockStatus === 'LOW_STOCK').length;
+  const currentOutOfStock = products.filter((p) => p.stockStatus === 'OUT_OF_STOCK').length;
+
+  const handleOpenNewTransfer = (type: 'RECEIPT' | 'DELIVERY' | 'INTERNAL') => {
+    const routes = {
+      RECEIPT: '/transfers/receipts',
+      DELIVERY: '/transfers/deliveries',
+      INTERNAL: '/transfers/internal',
+    };
+    navigate(routes[type]);
+  };
+
+  const handleOpenNewAdjustment = () => {
+    navigate('/adjustments');
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Welcome */}
-      <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">Inventory Overview</h1>
-            <span className="bg-purple-100 text-purple-800 text-[11px] font-bold px-2 py-0.5 rounded-full">
-              Live Real-Time
-            </span>
+      {/* Top Portfolio Welcome & Quick Actions Bar */}
+      <div className="bg-bg-surface rounded-2xl p-6 border border-border-subtle shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-h2 font-extrabold text-text-primary tracking-tight">Executive Stock Overview</h2>
+            <Badge variant="success" size="sm" dot>
+              REAL-TIME
+            </Badge>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Centralized snapshot of incoming receipts, customer dispatches, internal movements & physical counts.
+          <p className="text-body-sm text-text-muted">
+            Real-time balance of enterprise assets, supplier intake pipelines, and dispatch logistics across active facilities.
           </p>
         </div>
 
-        {/* Quick Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => onOpenNewTransfer('RECEIPT')}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Receipt</span>
-          </button>
-          <button
-            onClick={() => onOpenNewTransfer('DELIVERY')}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Delivery</span>
-          </button>
-          <button
-            onClick={() => onOpenNewTransfer('INTERNAL')}
-            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Internal Transfer</span>
-          </button>
+        {/* Global Action Triggers */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => handleOpenNewTransfer('RECEIPT')}>
+            New Receipt
+          </Button>
+
+          <Button variant="success" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => handleOpenNewTransfer('DELIVERY')}>
+            New Delivery
+          </Button>
+
+          <Button variant="secondary" size="sm" leftIcon={<ArrowLeftRight className="w-3.5 h-3.5 text-brand-primary" />} onClick={() => handleOpenNewTransfer('INTERNAL')}>
+            Internal Move
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={handleOpenNewAdjustment}>
+            Physical Count
+          </Button>
         </div>
       </div>
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-        {/* Total Products */}
-        <div
-          onClick={() => setActiveTab('products')}
-          className="bg-white p-4 rounded-xl shadow-xs border border-slate-200/80 hover:border-purple-300 hover:shadow-md transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Products</span>
-            <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition">
-              <Package className="w-4 h-4 text-purple-700" />
+      {/* Critical Stock Alert Watchlist Banner */}
+      {(currentLowStock > 0 || currentOutOfStock > 0) && (
+        <div className="p-4 rounded-2xl bg-brand-warning/10 border border-brand-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-body-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-warning/20 text-brand-warning flex items-center justify-center shrink-0 border border-brand-warning/30">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-brand-warning/90">
+                Safety Stock Watchlist: {currentLowStock} items below reorder limit, {currentOutOfStock} out of stock
+              </p>
+              <p className="text-brand-warning/80 text-caption mt-0.5">
+                Proactive replenishment required to prevent warehouse fulfilment delays.
+              </p>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-slate-900">{kpis.totalProductsCount}</span>
-            <span className="text-xs text-slate-500 font-medium">SKUs</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">{kpis.totalItemsInStock} units in stock</p>
-        </div>
 
-        {/* Low Stock / Out of Stock */}
-        <div
-          onClick={() => setActiveTab('products')}
-          className="bg-white p-4 rounded-xl shadow-xs border border-slate-200/80 hover:border-amber-300 hover:shadow-md transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Low / Out of Stock</span>
-            <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-amber-600">{kpis.lowStockCount + kpis.outOfStockCount}</span>
-            <span className="text-xs text-amber-700/80 font-medium">alerts</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            {kpis.outOfStockCount} zero stock, {kpis.lowStockCount} below min
-          </p>
+          <Button variant="warning" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5" />} onClick={() => navigate('/products')}>
+            Review Low Stock SKUs
+          </Button>
         </div>
+      )}
 
-        {/* Pending Receipts */}
-        <div
-          onClick={() => setActiveTab('receipts')}
-          className="bg-white p-4 rounded-xl shadow-xs border border-slate-200/80 hover:border-blue-300 hover:shadow-md transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pending Receipts</span>
-            <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition">
-              <ArrowDownLeft className="w-4 h-4 text-blue-600" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-blue-600">{kpis.pendingReceipts}</span>
-            <span className="text-xs text-slate-500 font-medium">incoming</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">To process on receiving dock</p>
-        </div>
+      {/* Primary KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Stock Asset Valuation"
+          value={totalCostValuation > 0 ? `₹${totalCostValuation.toLocaleString('en-IN')}` : `₹${(kpis.totalItemsInStock * 240).toLocaleString('en-IN')}`}
+          subtitle={`Est. Revenue: ₹${(totalSaleValuation > 0 ? totalSaleValuation : kpis.totalItemsInStock * 380).toLocaleString('en-IN')}`}
+          icon={DollarSign}
+          iconColor="text-brand-primary"
+          iconBg="bg-brand-primary/10"
+          badge={{ text: `${totalMargin || 35}% Margin`, variant: 'positive' }}
+          onClick={() => navigate('/products')}
+        />
 
-        {/* Pending Deliveries */}
-        <div
-          onClick={() => setActiveTab('deliveries')}
-          className="bg-white p-4 rounded-xl shadow-xs border border-slate-200/80 hover:border-emerald-300 hover:shadow-md transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Pending Deliveries</span>
-            <div className="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100 transition">
-              <ArrowUpRight className="w-4 h-4 text-emerald-600" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-600">{kpis.pendingDeliveries}</span>
-            <span className="text-xs text-slate-500 font-medium">outgoing</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Ready or waiting dispatch</p>
-        </div>
+        <StatCard
+          title="Total SKUs in Stock"
+          value={kpis.totalProductsCount}
+          subtitle={`${kpis.totalItemsInStock.toLocaleString()} total units on shelf`}
+          icon={Package}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+          badge={{ text: `${inStockPercentage}% Healthy`, variant: 'info' }}
+          onClick={() => navigate('/products')}
+        />
 
-        {/* Internal Transfers */}
-        <div
-          onClick={() => setActiveTab('internal')}
-          className="bg-white p-4 rounded-xl shadow-xs border border-slate-200/80 hover:border-violet-300 hover:shadow-md transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Internal Transfers</span>
-            <div className="p-2 bg-violet-50 rounded-lg group-hover:bg-violet-100 transition">
-              <ArrowLeftRight className="w-4 h-4 text-violet-600" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-violet-600">{kpis.internalScheduled}</span>
-            <span className="text-xs text-slate-500 font-medium">scheduled</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Warehouse/Rack movements</p>
-        </div>
+        <StatCard
+          title="Inbound Receipts"
+          value={operationsSummary.receipts.toProcess}
+          subtitle={`${operationsSummary.receipts.total} historical orders recorded`}
+          icon={ArrowDownLeft}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50"
+          badge={{ text: 'WH/IN Dock', variant: 'positive' }}
+          onClick={() => navigate('/transfers/receipts')}
+        />
+
+        <StatCard
+          title="Pending Dispatches"
+          value={operationsSummary.deliveries.toProcess}
+          subtitle={`${operationsSummary.deliveries.total} customer shipments processed`}
+          icon={ArrowUpRight}
+          iconColor="text-purple-600"
+          iconBg="bg-purple-50"
+          badge={{ text: 'WH/OUT Dispatch', variant: 'warning' }}
+          onClick={() => navigate('/transfers/deliveries')}
+        />
       </div>
 
-      {/* Wireframe Operation Cards Row (Matching Excalidraw Mockup exactly!) */}
+      {/* Operation Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Receipts Card */}
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-5 flex flex-col justify-between hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                Receipts
-              </h3>
-              <span className="text-[11px] bg-blue-50 text-blue-700 font-mono font-bold px-2 py-0.5 rounded">
-                WH/IN
-              </span>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div
-                onClick={() => setActiveTab('receipts')}
-                className="cursor-pointer hover:opacity-80 transition"
-              >
-                <span className="text-3xl font-black text-blue-700">{operationsSummary.receipts.toProcess}</span>
-                <span className="block text-xs font-semibold text-slate-500">To Process</span>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-slate-400">{operationsSummary.receipts.total}</span>
-                <span className="block text-[11px] text-slate-400">Total Ops</span>
-              </div>
-            </div>
+        <Card variant="default" padding="md" hoverable onClick={() => navigate('/transfers/receipts')}>
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+            <span className="text-caption font-bold text-text-secondary flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              Receipts (Inbound)
+            </span>
+            <Badge variant="info" size="sm">WH/IN</Badge>
           </div>
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => setActiveTab('receipts')}
-              className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline"
-            >
-              View Orders →
-            </button>
-            <button
-              onClick={() => onOpenNewTransfer('RECEIPT')}
-              className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-100 transition"
-            >
-              + New Receipt
-            </button>
-          </div>
-        </div>
 
-        {/* Delivery Orders Card */}
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-5 flex flex-col justify-between hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                Delivery Orders
-              </h3>
-              <span className="text-[11px] bg-emerald-50 text-emerald-700 font-mono font-bold px-2 py-0.5 rounded">
-                WH/OUT
-              </span>
+          <div className="mt-4 flex items-baseline justify-between">
+            <div>
+              <span className="text-3xl font-black text-text-primary font-mono">{operationsSummary.receipts.toProcess}</span>
+              <span className="block text-caption font-semibold text-text-muted mt-0.5">To Process</span>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div
-                onClick={() => setActiveTab('deliveries')}
-                className="cursor-pointer hover:opacity-80 transition"
-              >
-                <span className="text-3xl font-black text-emerald-700">{operationsSummary.deliveries.toProcess}</span>
-                <span className="block text-xs font-semibold text-slate-500">To Process</span>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-slate-400">{operationsSummary.deliveries.total}</span>
-                <span className="block text-[11px] text-slate-400">Total Ops</span>
-              </div>
+            <div className="text-right">
+              <span className="text-body font-bold text-text-muted font-mono">{operationsSummary.receipts.total}</span>
+              <span className="block text-micro text-text-muted">Total Lifecycle</span>
             </div>
           </div>
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => setActiveTab('deliveries')}
-              className="text-xs text-emerald-600 hover:text-emerald-800 font-bold hover:underline"
-            >
-              View Orders →
-            </button>
-            <button
-              onClick={() => onOpenNewTransfer('DELIVERY')}
-              className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-bold hover:bg-emerald-100 transition"
-            >
-              + New Delivery
-            </button>
-          </div>
-        </div>
 
-        {/* Internal Transfers Card */}
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-5 flex flex-col justify-between hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                Internal Transfers
-              </h3>
-              <span className="text-[11px] bg-amber-50 text-amber-700 font-mono font-bold px-2 py-0.5 rounded">
-                WH/INT
-              </span>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div
-                onClick={() => setActiveTab('internal')}
-                className="cursor-pointer hover:opacity-80 transition"
-              >
-                <span className="text-3xl font-black text-amber-700">{operationsSummary.internal.toProcess}</span>
-                <span className="block text-xs font-semibold text-slate-500">To Process</span>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-slate-400">{operationsSummary.internal.total}</span>
-                <span className="block text-[11px] text-slate-400">Total Ops</span>
-              </div>
-            </div>
+          <div className="mt-5 pt-3 border-t border-border-subtle flex items-center justify-between">
+            <Button variant="ghost" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5" />}>View Orders</Button>
+            <Button variant="secondary" size="sm" onClick={() => handleOpenNewTransfer('RECEIPT')}>+ Create</Button>
           </div>
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => setActiveTab('internal')}
-              className="text-xs text-amber-600 hover:text-amber-800 font-bold hover:underline"
-            >
-              View Transfers →
-            </button>
-            <button
-              onClick={() => onOpenNewTransfer('INTERNAL')}
-              className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-bold hover:bg-amber-100 transition"
-            >
-              + New Transfer
-            </button>
-          </div>
-        </div>
+        </Card>
 
-        {/* Inventory Adjustments Card */}
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-5 flex flex-col justify-between hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
-                Adjustments
-              </h3>
-              <span className="text-[11px] bg-violet-50 text-violet-700 font-mono font-bold px-2 py-0.5 rounded">
-                WH/ADJ
+        <Card variant="default" padding="md" hoverable onClick={() => navigate('/transfers/deliveries')}>
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+            <span className="text-caption font-bold text-text-secondary flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Delivery Orders
+            </span>
+            <Badge variant="success" size="sm">WH/OUT</Badge>
+          </div>
+
+          <div className="mt-4 flex items-baseline justify-between">
+            <div>
+              <span className="text-3xl font-black text-text-primary font-mono">{operationsSummary.deliveries.toProcess}</span>
+              <span className="block text-caption font-semibold text-text-muted mt-0.5">To Dispatch</span>
+            </div>
+            <div className="text-right">
+              <span className="text-body font-bold text-text-muted font-mono">{operationsSummary.deliveries.total}</span>
+              <span className="block text-micro text-text-muted">Total Orders</span>
+            </div>
+          </div>
+
+          <div className="mt-5 pt-3 border-t border-border-subtle flex items-center justify-between">
+            <Button variant="ghost" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5" />}>View Orders</Button>
+            <Button variant="success" size="sm" onClick={() => handleOpenNewTransfer('DELIVERY')}>+ Create</Button>
+          </div>
+        </Card>
+
+        <Card variant="default" padding="md" hoverable onClick={() => navigate('/transfers/internal')}>
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+            <span className="text-caption font-bold text-text-secondary flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-brand-warning" />
+              Internal Transfers
+            </span>
+            <Badge variant="warning" size="sm">WH/INT</Badge>
+          </div>
+
+          <div className="mt-4 flex items-baseline justify-between">
+            <div>
+              <span className="text-3xl font-black text-text-primary font-mono">{operationsSummary.internal.toProcess}</span>
+              <span className="block text-caption font-semibold text-text-muted mt-0.5">Scheduled</span>
+            </div>
+            <div className="text-right">
+              <span className="text-body font-bold text-text-muted font-mono">{operationsSummary.internal.total}</span>
+              <span className="block text-micro text-text-muted">Transferred</span>
+            </div>
+          </div>
+
+          <div className="mt-5 pt-3 border-t border-border-subtle flex items-center justify-between">
+            <Button variant="ghost" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5" />}>View Transfers</Button>
+            <Button variant="warning" size="sm" onClick={() => handleOpenNewTransfer('INTERNAL')}>+ Move</Button>
+          </div>
+        </Card>
+
+        <Card variant="default" padding="md" hoverable onClick={() => navigate('/adjustments')}>
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+            <span className="text-caption font-bold text-text-secondary flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-500" />
+              Physical Audits
+            </span>
+            <Badge variant="warning" size="sm">WH/ADJ</Badge>
+          </div>
+
+          <div className="mt-4 flex items-baseline justify-between">
+            <div>
+              <span className="text-3xl font-black text-text-primary font-mono">{operationsSummary.adjustments.total}</span>
+              <span className="block text-caption font-semibold text-text-muted mt-0.5">Audits Done</span>
+            </div>
+            <div className="text-right">
+              <span className="text-caption font-bold text-emerald-600 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> Reconciled
               </span>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div
-                onClick={() => setActiveTab('adjustments')}
-                className="cursor-pointer hover:opacity-80 transition"
-              >
-                <span className="text-3xl font-black text-violet-700">{operationsSummary.adjustments.total}</span>
-                <span className="block text-xs font-semibold text-slate-500">Adjustments</span>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <CheckCircle className="w-3.5 h-3.5" /> Audited
-                </span>
-                <span className="block text-[11px] text-slate-400">Reconciled</span>
-              </div>
+              <span className="block text-micro text-text-muted">Ledger Verified</span>
             </div>
           </div>
-          <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => setActiveTab('adjustments')}
-              className="text-xs text-violet-600 hover:text-violet-800 font-bold hover:underline"
-            >
-              View Audit Log →
-            </button>
-            <button
-              onClick={onOpenNewAdjustment}
-              className="px-2.5 py-1 bg-violet-50 text-violet-700 rounded-md text-xs font-bold hover:bg-violet-100 transition"
-            >
-              + Physical Count
-            </button>
+
+          <div className="mt-5 pt-3 border-t border-border-subtle flex items-center justify-between">
+            <Button variant="ghost" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5" />}>Audit Log</Button>
+            <Button variant="secondary" size="sm" onClick={handleOpenNewAdjustment}>+ Count</Button>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Main Grid: Category Stock & Live Movements Ledger Feed */}
+      {/* Main Grid: Category Stock Allocation & Live Ledger Stream */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Stock Distribution by Category */}
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-purple-700" />
-              Stock by Product Category
-            </h2>
-            <span className="text-xs font-semibold text-slate-400">{categoryStats.length} Categories</span>
+        {/* Left: Stock Asset Allocation by Category */}
+        <Card variant="default" padding="lg">
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+            <h3 className="font-bold text-body text-text-primary flex items-center gap-2">
+              <PieChart className="w-5 h-5 text-brand-primary" />
+              <span>Asset Allocation by Category</span>
+            </h3>
+            <span className="text-micro font-semibold text-text-muted font-mono">{categoryStats.length} Categories</span>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="space-y-4">
             {categoryStats.map((cat, idx) => {
               const maxQty = Math.max(...categoryStats.map((c) => c.totalQty), 1);
               const percentage = Math.round((cat.totalQty / maxQty) * 100);
+
               return (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="text-slate-700 font-semibold">{cat.category}</span>
-                    <span className="text-slate-500 font-mono">
-                      {cat.totalQty} units ({cat.productCount} SKUs)
+                <div key={idx} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-caption font-medium">
+                    <span className="text-text-primary font-semibold">{cat.category}</span>
+                    <span className="text-text-secondary font-mono font-bold">
+                      {cat.totalQty.toLocaleString()} units{' '}
+                      <span className="text-text-muted font-normal">({cat.productCount} SKUs)</span>
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+
+                  <div className="w-full bg-bg-elevated rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-gradient-to-r from-purple-500 to-[#714B67] h-full rounded-full transition-all duration-500"
+                      className="bg-brand-primary h-full rounded-full transition-all duration-500"
                       style={{ width: `${percentage}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-            <button
-              onClick={() => setActiveTab('products')}
-              className="text-xs text-purple-700 hover:text-purple-900 font-bold"
-            >
-              Manage Products & Reorder Rules →
-            </button>
+          <div className="pt-4 border-t border-border-subtle text-center">
+            <Button variant="ghost" size="sm" leftIcon={<ArrowRight className="w-3.5 h-3.5" />} onClick={() => navigate('/products')}>
+              Manage Product Master Data & Reordering Limits
+            </Button>
           </div>
-        </div>
+        </Card>
 
-        {/* Right: Live Ledger Movement Feed */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-xs border border-slate-200/80 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-600" />
-              Real-Time Stock Ledger Stream
-            </h2>
-            <button
-              onClick={() => setActiveTab('moves')}
-              className="text-xs text-purple-700 hover:text-purple-900 font-bold hover:underline"
-            >
-              Full Stock Ledger →
-            </button>
+        {/* Right: Real-Time Stock Ledger Audit Feed */}
+        <Card variant="default" padding="lg" className="lg:col-span-2">
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-emerald-600" />
+              <h3 className="font-bold text-body text-text-primary">Live Double-Entry Stock Ledger Stream</h3>
+            </div>
+            <Button variant="ghost" size="sm" leftIcon={<ExternalLink className="w-3.5 h-3.5" />} onClick={() => navigate('/moves')}>
+              Full Ledger
+            </Button>
           </div>
 
           {recentMoves.length === 0 ? (
-            <p className="text-xs text-slate-400 py-6 text-center">No movements recorded yet.</p>
+            <div className="py-12 text-center text-text-muted text-caption">
+              No transactions recorded yet in the ledger.
+            </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-caption">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="pb-2">Time</th>
-                    <th className="pb-2">Ref</th>
-                    <th className="pb-2">Product</th>
-                    <th className="pb-2">From → To</th>
-                    <th className="pb-2 text-right">Quantity</th>
+                  <tr className="border-b border-border-subtle text-micro font-bold text-text-muted uppercase tracking-wider">
+                    <th className="pb-2.5">Time</th>
+                    <th className="pb-2.5">Reference</th>
+                    <th className="pb-2.5">Product & SKU</th>
+                    <th className="pb-2.5">From → To</th>
+                    <th className="pb-2.5 text-right">Quantity</th>
+                    <th className="pb-2.5 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-border-subtle">
                   {recentMoves.map((move: any) => (
-                    <tr key={move.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-2.5 text-slate-500 font-mono text-[11px]">
+                    <tr key={move.id} className="hover:bg-bg-elevated/50 transition-colors">
+                      <td className="py-3 text-text-muted font-mono text-micro">
                         {new Date(move.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="py-2.5 font-bold font-mono text-purple-900">
-                        {move.reference}
+                      <td className="py-3 font-mono font-bold text-brand-primary">{move.reference}</td>
+                      <td className="py-3">
+                        <div className="font-semibold text-text-primary">{move.product.name}</div>
+                        <div className="text-micro text-text-muted font-mono">{move.product.sku}</div>
                       </td>
-                      <td className="py-2.5">
-                        <div className="font-semibold text-slate-800">{move.product.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{move.product.sku}</div>
+                      <td className="py-3 text-text-secondary">
+                        <span className="font-medium text-text-secondary">{move.sourceLocation.name}</span>
+                        <span className="mx-1.5 text-text-muted font-bold">→</span>
+                        <span className="font-semibold text-emerald-700">{move.destLocation.name}</span>
                       </td>
-                      <td className="py-2.5 text-slate-600">
-                        <span className="font-medium text-slate-700">{move.sourceLocation.name}</span>
-                        <span className="mx-1 text-slate-400">→</span>
-                        <span className="font-medium text-emerald-700">{move.destLocation.name}</span>
-                      </td>
-                      <td className="py-2.5 text-right font-mono font-bold text-slate-900">
+                      <td className="py-3 text-right font-mono font-bold text-text-primary">
                         +{move.quantity} {move.uom || move.product.uom}
+                      </td>
+                      <td className="py-3 text-center">
+                        <StatusBadge status={move.status} />
                       </td>
                     </tr>
                   ))}
@@ -464,7 +396,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </table>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

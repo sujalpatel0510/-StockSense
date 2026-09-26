@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, AlertTriangle, Building2, User, ChevronDown, Bell } from 'lucide-react';
+import { Menu, Search, AlertTriangle, Building2, User, ChevronDown, Bell, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Warehouse } from '../types';
 import { ActiveTab } from './Navbar';
@@ -14,6 +14,8 @@ interface HeaderProps {
   onOpenProfile: () => void;
   searchTerm?: string;
   setSearchTerm?: (term: string) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +28,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   searchTerm,
   setSearchTerm,
+  onRefresh,
+  isRefreshing,
 }) => {
   const { user } = useAuth();
 
@@ -84,17 +88,34 @@ export const Header: React.FC<HeaderProps> = ({
           <span>{selectedWh ? selectedWh.code : 'All Warehouses'}</span>
         </div>
 
+        {/* Live Sync / Refresh Button */}
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition border border-slate-200 shadow-2xs"
+            title="Refresh latest data from database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isRefreshing ? 'Syncing...' : 'Sync'}</span>
+          </button>
+        )}
+
         {/* Low Stock Alert Button */}
         {lowStockCount > 0 && (
-          <button
-            onClick={() => setActiveTab('products')}
+          <a
+            href="#/products"
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab('products');
+            }}
             className="flex items-center space-x-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-800 rounded-lg text-xs font-bold hover:bg-amber-500/20 transition"
             title={`${lowStockCount} items below safety threshold`}
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
             <span className="hidden sm:inline">{lowStockCount} Low Stock</span>
             <span className="sm:hidden">{lowStockCount}</span>
-          </button>
+          </a>
         )}
 
         {/* Profile Avatar Trigger */}

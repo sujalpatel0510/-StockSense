@@ -82,8 +82,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('stocksense_token');
+    sessionStorage.clear();
     setToken(null);
     setUser(null);
+    window.location.href = '/';
   };
 
   return (

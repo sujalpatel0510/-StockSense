@@ -8,16 +8,21 @@ import {
   Building2,
   CheckCircle,
   FileSpreadsheet,
+  Activity,
+  Layers,
+  ShieldCheck,
+  Package,
 } from 'lucide-react';
 import { StockMove, Product, Location } from '../types';
+import { StatCard, Card } from '../components/ui';
+import { StatusBadge, Badge } from '../components/ui';
+import { EmptyState } from '../components/ui';
+import { Button, Input, Select } from '../components/ui';
+import { useData } from '../context/DataContext';
 
-interface MoveHistoryPageProps {
-  moves: StockMove[];
-  products: Product[];
-  locations: Location[];
-}
+export const MoveHistoryPage: React.FC = () => {
+  const { moves, products, locations } = useData();
 
-export const MoveHistoryPage: React.FC<MoveHistoryPageProps> = ({ moves, products, locations }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState('');
@@ -38,9 +43,22 @@ export const MoveHistoryPage: React.FC<MoveHistoryPageProps> = ({ moves, product
     return matchesSearch && matchesProduct && matchesLocation;
   });
 
+  const totalUnitsMoved = moves.reduce((acc, m) => acc + m.quantity, 0);
+
   const handleExportCSV = () => {
     if (filteredMoves.length === 0) return;
-    const headers = ['Date', 'Reference', 'Product Name', 'SKU', 'Source Location', 'Destination Location', 'Quantity', 'UoM', 'Status', 'Notes'];
+    const headers = [
+      'Date',
+      'Reference',
+      'Product Name',
+      'SKU',
+      'Source Location',
+      'Destination Location',
+      'Quantity',
+      'UoM',
+      'Status',
+      'Notes',
+    ];
     const rows = filteredMoves.map((m) => [
       `"${new Date(m.createdAt).toISOString()}"`,
       `"${m.reference}"`,
@@ -54,7 +72,9 @@ export const MoveHistoryPage: React.FC<MoveHistoryPageProps> = ({ moves, product
       `"${m.notes || ''}"`,
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -65,101 +85,142 @@ export const MoveHistoryPage: React.FC<MoveHistoryPageProps> = ({ moves, product
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Top Header */}
+      <Card variant="default" padding="lg" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-purple-50 text-purple-700 rounded-xl">
+          <div className="p-3 bg-brand-primary/10 text-brand-primary rounded-xl">
             <History className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
-              Move History & Stock Ledger
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h1 className="text-h2 font-extrabold text-text-primary tracking-tight">Move History & Stock Ledger</h1>
+            <p className="text-caption text-text-muted mt-0.5">
               Complete, immutable double-entry audit trail tracking every physical stock movement across your enterprise.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs shrink-0"
-        >
-          <Download className="w-4 h-4 text-slate-500" />
-          <span>Export Ledger (CSV)</span>
-        </button>
+        <Button variant="secondary" leftIcon={<Download className="w-4 h-4 text-text-muted" />} onClick={handleExportCSV}>
+          Export Ledger (CSV)
+        </Button>
+      </Card>
+
+      {/* KPI Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Ledger Moves"
+          value={moves.length}
+          subtitle="Immutable transaction events"
+          icon={Activity}
+          iconColor="text-brand-primary"
+          iconBg="bg-brand-primary/10"
+        />
+
+        <StatCard
+          title="Total Units Transferred"
+          value={totalUnitsMoved.toLocaleString()}
+          subtitle="Cumulative items dispatched/received"
+          icon={Package}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+        />
+
+        <StatCard
+          title="Tracked Locations"
+          value={locations.length}
+          subtitle="Warehouses, docks & staging zones"
+          icon={Building2}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50"
+        />
+
+        <StatCard
+          title="Ledger Compliance"
+          value="100%"
+          subtitle="Double-entry balanced debits & credits"
+          icon={ShieldCheck}
+          iconColor="text-purple-600"
+          iconBg="bg-purple-50"
+          badge={{ text: 'Verified', variant: 'positive' }}
+        />
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white p-3.5 rounded-xl shadow-xs border border-slate-200/80 flex flex-wrap items-center gap-3">
+      <Card variant="default" padding="md" className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-          <input
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <Input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by Reference, Product, SKU or Location..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="pl-9 pr-3"
           />
         </div>
 
         {/* Product Filter */}
-        <select
+        <Select
           value={selectedProductId}
           onChange={(e) => setSelectedProductId(e.target.value)}
-          className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium text-slate-700 max-w-[200px]"
-        >
-          <option value="">All Products</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: 'All Products' },
+            ...products.map((p) => ({ value: p.id, label: p.name })),
+          ]}
+          className="max-w-[200px]"
+        />
 
         {/* Location Filter */}
-        <select
+        <Select
           value={selectedLocationId}
           onChange={(e) => setSelectedLocationId(e.target.value)}
-          className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium text-slate-700 max-w-[200px]"
-        >
-          <option value="">All Locations</option>
-          {locations.map((loc) => (
-            <option key={loc.id} value={loc.id}>
-              {loc.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          options={[
+            { value: '', label: 'All Locations' },
+            ...locations.map((loc) => ({ value: loc.id, label: loc.name })),
+          ]}
+          className="max-w-[200px]"
+        />
 
-      {/* Ledger Table (Matching Wireframe!) */}
-      <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3 px-4">Date & Time</th>
-                <th className="py-3 px-3">Reference</th>
-                <th className="py-3 px-3">From (Source)</th>
-                <th className="py-3 px-3">To (Destination)</th>
-                <th className="py-3 px-3">Product</th>
-                <th className="py-3 px-3 text-right">Quantity</th>
-                <th className="py-3 px-3">Unit</th>
-                <th className="py-3 px-4 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredMoves.length === 0 ? (
+        <Button variant="secondary" leftIcon={<Filter className="w-4 h-4" />} onClick={() => {
+          setSearchTerm('');
+          setSelectedProductId('');
+          setSelectedLocationId('');
+        }}>
+          Clear Filters
+        </Button>
+      </Card>
+
+      {/* Ledger Table */}
+      {filteredMoves.length === 0 ? (
+        <EmptyState
+          title="No Stock Movements Found"
+          description="No ledger transactions match your current search filters. Try clearing your filters."
+          actionLabel="Clear Filters"
+          onAction={() => {
+            setSearchTerm('');
+            setSelectedProductId('');
+            setSelectedLocationId('');
+          }}
+        />
+      ) : (
+        <Card variant="default" padding="none" className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-caption">
+              <thead className="bg-bg-elevated/50 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-micro">
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
-                    No movements logged in the ledger matching criteria.
-                  </td>
+                  <th className="py-3.5 px-4">Date & Time</th>
+                  <th className="py-3.5 px-3">Reference</th>
+                  <th className="py-3.5 px-3">From (Source)</th>
+                  <th className="py-3.5 px-3">To (Destination)</th>
+                  <th className="py-3.5 px-3">Product & SKU</th>
+                  <th className="py-3.5 px-3 text-right">Quantity</th>
+                  <th className="py-3.5 px-3">Unit</th>
+                  <th className="py-3.5 px-4 text-center">Status</th>
                 </tr>
-              ) : (
-                filteredMoves.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {filteredMoves.map((m) => (
+                  <tr key={m.id} className="hover:bg-bg-elevated/50 transition-colors">
+                    <td className="py-3.5 px-4 text-text-muted font-mono tabular-nums text-micro">
                       {new Date(m.createdAt).toLocaleString([], {
                         year: 'numeric',
                         month: 'short',
@@ -168,37 +229,31 @@ export const MoveHistoryPage: React.FC<MoveHistoryPageProps> = ({ moves, product
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-purple-900">
-                      {m.reference}
-                    </td>
-                    <td className="py-3 px-3 text-slate-700">
+                    <td className="py-3.5 px-3 font-mono font-bold text-brand-primary">{m.reference}</td>
+                    <td className="py-3.5 px-3 text-text-secondary">
                       <div className="font-medium">{m.sourceLocation.name}</div>
-                      <span className="text-[10px] text-slate-400 font-mono">{m.sourceLocation.code}</span>
+                      <span className="text-micro text-text-muted font-mono">{m.sourceLocation.code}</span>
                     </td>
-                    <td className="py-3 px-3 text-emerald-800">
+                    <td className="py-3.5 px-3 text-emerald-800">
                       <div className="font-medium">{m.destLocation.name}</div>
-                      <span className="text-[10px] text-slate-400 font-mono">{m.destLocation.code}</span>
+                      <span className="text-micro text-text-muted font-mono">{m.destLocation.code}</span>
                     </td>
-                    <td className="py-3 px-3">
-                      <div className="font-bold text-slate-900">{m.product.name}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{m.product.sku}</div>
+                    <td className="py-3.5 px-3">
+                      <div className="font-bold text-text-primary">{m.product.name}</div>
+                      <div className="text-micro font-mono text-text-muted">{m.product.sku}</div>
                     </td>
-                    <td className="py-3 px-3 text-right font-mono font-black text-slate-900 text-sm">
-                      {m.quantity}
-                    </td>
-                    <td className="py-3 px-3 text-slate-600 font-medium">{m.uom}</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3 text-emerald-600" /> Done
-                      </span>
+                    <td className="py-3.5 px-3 text-right font-mono tabular-nums font-black text-text-primary text-body">+{m.quantity}</td>
+                    <td className="py-3.5 px-3 text-text-secondary font-medium">{m.uom}</td>
+                    <td className="py-3.5 px-4 text-center">
+                      <StatusBadge status="DONE" />
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

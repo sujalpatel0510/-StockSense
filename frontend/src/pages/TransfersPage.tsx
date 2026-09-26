@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -19,33 +20,37 @@ import {
   ArrowRight,
   PackageCheck,
   CheckCheck,
+  X,
+  FileText,
 } from 'lucide-react';
 import { OperationTransfer, OperationType, OperationStatus, Product, Location } from '../types';
 import api from '../services/api';
+import { StatusBadge, Badge } from '../components/ui';
+import { EmptyState } from '../components/ui';
+import { Button, Input, Select, Card } from '../components/ui';
+import { Drawer } from '../components/ui';
+import { useData } from '../context/DataContext';
 
 interface TransfersPageProps {
   type: OperationType;
-  transfers: OperationTransfer[];
-  products: Product[];
-  locations: Location[];
-  onRefresh: () => void;
-  openCreateByDefault?: boolean;
 }
 
-export const TransfersPage: React.FC<TransfersPageProps> = ({
-  type,
-  transfers,
-  products,
-  locations,
-  onRefresh,
-  openCreateByDefault = false,
-}) => {
+export const TransfersPage: React.FC<TransfersPageProps> = ({ type }) => {
+  const navigate = useNavigate();
+  const params = useParams();
+  const { 
+    transfers: allTransfers, 
+    products, 
+    locations, 
+    refreshTransfers,
+    refreshProducts,
+  } = useData();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-
-  // Selected Transfer for Form View
   const [selectedTransfer, setSelectedTransfer] = useState<OperationTransfer | null>(null);
-  const [isCreating, setIsCreating] = useState(openCreateByDefault);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // New Transfer Form State
   const [partnerName, setPartnerName] = useState('');
@@ -71,9 +76,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
     },
   ]);
 
-  // Done qty edits in form view
   const [doneUpdates, setDoneUpdates] = useState<Record<string, number>>({});
-
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -98,8 +101,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
     INTERNAL: {
       title: 'Internal Stock Transfers',
       shortCode: 'WH/INT',
-      partnerLabel: 'Internal Department / Reason',
-      partnerPlaceholder: 'e.g. Production Floor Requisition',
+      partnerLabel: 'Department / Internal Reason',
+      partnerPlaceholder: 'e.g. Assembly Line Requisition',
       color: 'amber',
       icon: ArrowLeftRight,
     },
@@ -116,7 +119,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   const Icon = config.icon;
 
   // Filter transfers
-  const filteredTransfers = transfers.filter((t) => {
+  const filteredTransfers = allTransfers.filter((t) => {
     if (t.type !== type) return false;
     const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
     const matchesSearch =
@@ -125,21 +128,6 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
       t.lines.some((l) => l.product?.name.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesStatus && matchesSearch;
   });
-
-  const getStatusBadge = (status: OperationStatus) => {
-    switch (status) {
-      case 'DRAFT':
-        return <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Draft</span>;
-      case 'WAITING':
-        return <span className="bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Waiting</span>;
-      case 'READY':
-        return <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Ready</span>;
-      case 'DONE':
-        return <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Done</span>;
-      case 'CANCELED':
-        return <span className="bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold">Canceled</span>;
-    }
-  };
 
   // Line helpers
   const handleAddLine = () => {
@@ -184,9 +172,10 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
         lines,
       });
 
-      setFeedback({ type: 'success', message: 'Transfer created successfully in Draft!' });
+      setFeedback({ type: 'success', message: 'Transfer document successfully recorded in Draft!' });
       setIsCreating(false);
-      onRefresh();
+      setIsDrawerOpen(false);
+      await refreshTransfers();
       setSelectedTransfer(res.data);
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to create transfer.' });
@@ -201,8 +190,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
     try {
       const res = await api.markTransferReady(id);
       setFeedback({ type: 'success', message: res.message });
-      onRefresh();
-      // refresh active
+      await refreshTransfers();
       const refreshed = await api.getTransfer(id);
       setSelectedTransfer(refreshed.data);
     } catch (err: any) {
@@ -223,7 +211,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
 
       const res = await api.validateTransfer(id, lineUpdates.length > 0 ? lineUpdates : undefined);
       setFeedback({ type: 'success', message: res.message });
-      onRefresh();
+      await refreshTransfers();
       setSelectedTransfer(res.data);
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message });
@@ -233,13 +221,13 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm('Are you sure you want to cancel this transfer?')) return;
+    if (!confirm('Are you sure you want to cancel this transfer order?')) return;
     setActionLoading(true);
     setFeedback(null);
     try {
       const res = await api.cancelTransfer(id);
       setFeedback({ type: 'success', message: res.message });
-      onRefresh();
+      await refreshTransfers();
       setSelectedTransfer((prev) => (prev ? { ...prev, status: 'CANCELED' } : null));
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message });
@@ -265,22 +253,24 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
     };
 
     return (
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
         {steps.map((step, idx) => {
           const state = getStepState(step);
           return (
             <React.Fragment key={step}>
-              {idx > 0 && <span className="text-slate-300 text-xs">→</span>}
+              {idx > 0 && <span className="text-text-muted text-caption font-bold">→</span>}
               <div
-                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-caption font-bold transition flex items-center gap-1.5 ${
                   state === 'completed'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    ? 'bg-status-success-bg text-status-success-text border border-status-success-border'
                     : state === 'active'
-                    ? 'bg-[#714B67] text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-400'
+                    ? 'bg-brand-primary text-white shadow-xs'
+                    : state === 'canceled'
+                    ? 'bg-status-danger-bg text-status-danger-text border border-status-danger-border'
+                    : 'bg-bg-elevated text-text-muted'
                 }`}
               >
-                {state === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />}
+                {state === 'completed' && <CheckCircle className="w-3.5 h-3.5 text-status-success-text" />}
                 <span>{step}</span>
               </div>
             </React.Fragment>
@@ -290,118 +280,130 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
     );
   };
 
+  // Check if we should open detail view from URL
+  useEffect(() => {
+    if (params.id && !selectedTransfer) {
+      const transfer = allTransfers.find(t => t.id === params.id);
+      if (transfer) {
+        setSelectedTransfer(transfer);
+        setIsDrawerOpen(true);
+      }
+    }
+  }, [params.id, allTransfers, selectedTransfer]);
+
   return (
-    <div className="space-y-5">
-      {/* Notifications */}
+    <div className="space-y-6">
+      {/* User Feedback Alert */}
       {feedback && (
         <div
-          className={`p-3.5 rounded-xl border text-xs flex items-center justify-between ${
+          className={`p-4 rounded-2xl border text-caption flex items-center justify-between shadow-xs ${
             feedback.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : 'bg-rose-50 border-rose-200 text-rose-800'
+              ? 'bg-status-success-bg border-status-success-border text-status-success-text'
+              : 'bg-status-danger-bg border-status-danger-border text-status-danger-text'
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {feedback.type === 'success' ? (
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <CheckCircle className="w-4 h-4 shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600" />
+              <AlertCircle className="w-4 h-4 shrink-0" />
             )}
-            <span>{feedback.message}</span>
+            <span className="font-medium">{feedback.message}</span>
           </div>
-          <button onClick={() => setFeedback(null)} className="font-bold text-xs">
-            ✕
+          <button
+            onClick={() => setFeedback(null)}
+            className="text-text-muted hover:text-text-primary font-bold p-1"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* FORM / DETAIL VIEW (If an order is opened or being created) */}
-      {(selectedTransfer || isCreating) ? (
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-6 space-y-6">
-          {/* Top Form Header with Reference & Workflow Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setSelectedTransfer(null);
-                  setIsCreating(false);
-                }}
-                className="text-xs font-bold text-slate-500 hover:text-slate-900 border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition"
-              >
-                ← Back to List
-              </button>
-              <div>
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  {config.title}
-                </span>
-                <h2 className="text-xl font-black text-slate-900 font-mono">
-                  {isCreating ? `New ${config.shortCode} Draft` : selectedTransfer?.reference}
-                </h2>
-              </div>
-            </div>
-
-            {/* Workflow status bar */}
-            {!isCreating && selectedTransfer && renderWorkflowStatus(selectedTransfer.status)}
-          </div>
-
-          {/* Action Buttons Toolbar */}
+      {/* DETAIL / CREATION DRAWER */}
+      <Drawer
+        isOpen={isDrawerOpen || isCreating || !!selectedTransfer}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setIsCreating(false);
+          setSelectedTransfer(null);
+          if (params.id) navigate('/transfers/' + type.toLowerCase() + 's');
+        }}
+        title={isCreating ? `New ${config.shortCode} Draft` : selectedTransfer?.reference}
+        description={config.title}
+        size="xl"
+      >
+        <div className="space-y-6">
+          {/* Action Toolbar */}
           {!isCreating && selectedTransfer && (
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-lg border border-slate-200/60">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-bg-elevated/50 p-3.5 rounded-xl border border-border-subtle">
+              <div className="flex flex-wrap items-center gap-2">
                 {selectedTransfer.status === 'DRAFT' && (
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<PackageCheck className="w-4 h-4" />}
                     onClick={() => handleMarkReady(selectedTransfer.id)}
                     disabled={actionLoading}
-                    className="px-4 py-1.5 bg-[#714B67] hover:bg-[#593952] text-white rounded-lg text-xs font-bold shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    <PackageCheck className="w-4 h-4" />
-                    <span>Mark as Ready</span>
-                  </button>
+                    Mark as Ready
+                  </Button>
                 )}
 
                 {selectedTransfer.status === 'WAITING' && (
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<CheckCheck className="w-4 h-4" />}
                     onClick={() => handleMarkReady(selectedTransfer.id)}
                     disabled={actionLoading}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    <CheckCheck className="w-4 h-4" />
-                    <span>Check Availability & Mark Ready</span>
-                  </button>
+                    Check Availability & Mark Ready
+                  </Button>
                 )}
 
                 {selectedTransfer.status === 'READY' && (
-                  <button
+                  <Button
+                    variant="success"
+                    size="sm"
+                    leftIcon={<CheckCircle className="w-4 h-4" />}
                     onClick={() => handleValidate(selectedTransfer.id)}
                     disabled={actionLoading}
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition flex items-center gap-1.5 animate-pulse disabled:opacity-50"
                   >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Validate (Move Inventory)</span>
-                  </button>
+                    Validate (Transfer Stock)
+                  </Button>
                 )}
 
                 {selectedTransfer.status !== 'DONE' && selectedTransfer.status !== 'CANCELED' && (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<XCircle className="w-3.5 h-3.5" />}
                     onClick={() => handleCancel(selectedTransfer.id)}
                     disabled={actionLoading}
-                    className="px-3 py-1.5 border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                    className="text-brand-danger border-brand-danger hover:bg-brand-danger/5"
                   >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Cancel</span>
-                  </button>
+                    Cancel Transfer
+                  </Button>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Printer className="w-3.5 h-3.5 text-text-muted" />}
                   onClick={() => window.print()}
-                  className="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
                 >
-                  <Printer className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Print Slip</span>
-                </button>
+                  Print Slip
+                </Button>
               </div>
+            </div>
+          )}
+
+          {/* Workflow stepper */}
+          {!isCreating && selectedTransfer && (
+            <div className="py-2">
+              {renderWorkflowStatus(selectedTransfer.status)}
             </div>
           )}
 
@@ -410,104 +412,76 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
             <form onSubmit={handleCreateTransfer} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {config.partnerLabel}
-                  </label>
-                  <input
+                  <label className="label-base">{config.partnerLabel}</label>
+                  <Input
                     type="text"
                     value={partnerName}
                     onChange={(e) => setPartnerName(e.target.value)}
                     placeholder={config.partnerPlaceholder}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Scheduled Date</label>
-                  <input
+                  <label className="label-base">Scheduled Date</label>
+                  <Input
                     type="date"
                     required
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Source Location (From)</label>
-                  <select
+                  <label className="label-base">Source Location (From)</label>
+                  <Select
                     value={sourceLocationId}
                     onChange={(e) => setSourceLocationId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name} ({loc.code})
-                      </option>
-                    ))}
-                  </select>
+                    options={locations.map((loc) => ({ value: loc.id, label: `${loc.name} (${loc.code})` }))}
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Destination Location (To)</label>
-                  <select
+                  <label className="label-base">Destination Location (To)</label>
+                  <Select
                     value={destLocationId}
                     onChange={(e) => setDestLocationId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-white"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name} ({loc.code})
-                      </option>
-                    ))}
-                  </select>
+                    options={locations.map((loc) => ({ value: loc.id, label: `${loc.name} (${loc.code})` }))}
+                  />
                 </div>
               </div>
 
-              {/* Lines Table */}
-              <div className="space-y-2">
+              {/* Order Lines */}
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Product Order Lines
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={handleAddLine}
-                    className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded text-xs font-bold flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Product</span>
-                  </button>
+                  <h4 className="text-caption font-bold uppercase tracking-wider text-text-muted">Product Order Lines</h4>
+                  <Button variant="secondary" size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />} onClick={handleAddLine}>
+                    Add Item
+                  </Button>
                 </div>
 
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[11px]">
+                <div className="border border-border-subtle rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-caption">
+                    <thead className="bg-bg-elevated border-b border-border-subtle text-text-muted font-bold uppercase text-micro">
                       <tr>
-                        <th className="py-2.5 px-3">Product</th>
-                        <th className="py-2.5 px-3 w-32">Demand Qty</th>
-                        <th className="py-2.5 px-3 w-28">UoM</th>
-                        <th className="py-2.5 px-3 w-12 text-center"></th>
+                        <th className="py-3 px-3">Product</th>
+                        <th className="py-3 px-3 w-36">Demand Quantity</th>
+                        <th className="py-3 px-3 w-28">UoM</th>
+                        <th className="py-3 px-3 w-12 text-center"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-border-subtle">
                       {lines.map((line, idx) => (
                         <tr key={idx}>
-                          <td className="py-2 px-3">
-                            <select
+                          <td className="py-2.5 px-3">
+                            <Select
                               value={line.productId}
                               onChange={(e) => handleProductChange(idx, e.target.value)}
-                              className="w-full px-2 py-1 text-xs border border-slate-200 rounded bg-white font-medium"
-                            >
-                              {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name} ({p.sku})
-                                </option>
-                              ))}
-                            </select>
+                              options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+                              className="font-medium"
+                            />
                           </td>
-                          <td className="py-2 px-3">
-                            <input
+                          <td className="py-2.5 px-3">
+                            <Input
                               type="number"
                               min="0.01"
                               step="any"
@@ -518,19 +492,20 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
                                 updated[idx].demandQty = Number(e.target.value);
                                 setLines(updated);
                               }}
-                              className="w-full px-2 py-1 text-xs font-mono font-bold border border-slate-200 rounded"
+                              className="font-mono tabular-nums font-bold"
                             />
                           </td>
-                          <td className="py-2 px-3 text-slate-500 font-medium">{line.uom}</td>
-                          <td className="py-2 px-3 text-center">
-                            <button
-                              type="button"
+                          <td className="py-2.5 px-3 text-text-muted font-medium">{line.uom}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleRemoveLine(idx)}
                               disabled={lines.length <= 1}
-                              className="text-slate-400 hover:text-rose-600 disabled:opacity-30"
+                              className="text-text-muted hover:text-brand-danger"
                             >
                               <Trash2 className="w-4 h-4" />
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -540,102 +515,90 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Notes / Instructions</label>
+                <label className="label-base">Notes / Instructions</label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Carrier reference, dock instructions or inspection notes..."
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg"
+                  placeholder="Carrier reference, shipping tags or handling notes..."
+                  className="input-base resize-y"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCreating(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold hover:bg-slate-50"
-                >
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-border-subtle">
+                <Button variant="secondary" type="button" onClick={() => setIsCreating(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-5 py-2 bg-[#714B67] hover:bg-[#593952] text-white rounded-lg text-xs font-bold shadow-xs transition disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="primary" type="submit" disabled={actionLoading}>
                   {actionLoading ? 'Saving...' : 'Save As Draft'}
-                </button>
+                </Button>
               </div>
             </form>
           ) : (
             selectedTransfer && (
               <div className="space-y-6">
-                {/* Information Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50/50 rounded-xl border border-slate-200/60 text-xs">
+                {/* Meta details */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-bg-elevated/50 rounded-2xl border border-border-subtle text-caption">
                   <div>
-                    <span className="text-slate-400 block text-[11px] font-semibold">{config.partnerLabel}</span>
-                    <span className="font-bold text-slate-800 text-sm">{selectedTransfer.partnerName || '—'}</span>
+                    <span className="text-text-muted block text-micro font-semibold">{config.partnerLabel}</span>
+                    <span className="font-bold text-text-primary text-body">{selectedTransfer.partnerName || '—'}</span>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[11px] font-semibold">Scheduled Date</span>
-                    <span className="font-bold text-slate-800">
+                    <span className="text-text-muted block text-micro font-semibold">Scheduled Date</span>
+                    <span className="font-bold text-text-primary">
                       {new Date(selectedTransfer.scheduledDate).toLocaleDateString()}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[11px] font-semibold">Source Location</span>
-                    <span className="font-bold text-slate-800">{selectedTransfer.sourceLocation.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono block">
-                      {selectedTransfer.sourceLocation.code}
-                    </span>
+                    <span className="text-text-muted block text-micro font-semibold">Source Location</span>
+                    <span className="font-bold text-text-primary">{selectedTransfer.sourceLocation.name}</span>
+                    <span className="text-micro text-text-muted font-mono block">{selectedTransfer.sourceLocation.code}</span>
                   </div>
 
                   <div>
-                    <span className="text-slate-400 block text-[11px] font-semibold">Destination Location</span>
+                    <span className="text-text-muted block text-micro font-semibold">Destination Location</span>
                     <span className="font-bold text-emerald-800">{selectedTransfer.destLocation.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono block">
-                      {selectedTransfer.destLocation.code}
-                    </span>
+                    <span className="text-micro text-text-muted font-mono block">{selectedTransfer.destLocation.code}</span>
                   </div>
                 </div>
 
-                {/* Transfer Lines Table */}
+                {/* Items & Fulfillment Table */}
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Items & Quantities
+                  <h4 className="text-caption font-bold uppercase tracking-wider text-text-muted mb-2.5">
+                    Order Items & Physical Fulfillment
                   </h4>
-                  <div className="border border-slate-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[11px]">
+                  <div className="border border-border-subtle rounded-2xl overflow-hidden">
+                    <table className="w-full text-left text-caption">
+                      <thead className="bg-bg-elevated border-b border-border-subtle text-text-muted font-bold uppercase text-micro">
                         <tr>
-                          <th className="py-2.5 px-3">Product Name & SKU</th>
-                          <th className="py-2.5 px-3 text-right">Demand</th>
-                          <th className="py-2.5 px-3 text-right">Done Qty</th>
-                          <th className="py-2.5 px-3">UoM</th>
-                          <th className="py-2.5 px-3 text-center">Status</th>
+                          <th className="py-3 px-4">Product Name & SKU</th>
+                          <th className="py-3 px-3 text-right">Demand</th>
+                          <th className="py-3 px-3 text-right">Done Qty</th>
+                          <th className="py-3 px-3">UoM</th>
+                          <th className="py-3 px-4 text-center">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-border-subtle">
                         {selectedTransfer.lines.map((line) => {
                           const currentDone = doneUpdates[line.id!] ?? line.doneQty;
                           const isDone = selectedTransfer.status === 'DONE';
 
                           return (
-                            <tr key={line.id} className="hover:bg-slate-50/50">
-                              <td className="py-2.5 px-3">
-                                <div className="font-bold text-slate-900">{line.product?.name}</div>
-                                <div className="text-[11px] font-mono text-purple-700">{line.product?.sku}</div>
+                            <tr key={line.id} className="hover:bg-bg-elevated/50">
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-text-primary">{line.product?.name}</div>
+                                <div className="text-micro font-mono text-brand-primary">{line.product?.sku}</div>
                               </td>
-                              <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-700">
+                              <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-text-secondary">
                                 {line.demandQty}
                               </td>
-                              <td className="py-2.5 px-3 text-right">
+                              <td className="py-3 px-3 text-right">
                                 {isDone ? (
-                                  <span className="font-mono font-bold text-emerald-700">{line.doneQty}</span>
+                                  <span className="font-mono tabular-nums font-bold text-emerald-700">{line.doneQty}</span>
                                 ) : selectedTransfer.status === 'READY' ? (
-                                  <input
+                                  <Input
                                     type="number"
                                     min="0"
                                     step="any"
@@ -646,26 +609,20 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
                                         [line.id!]: Number(e.target.value),
                                       })
                                     }
-                                    className="w-20 px-2 py-1 text-right font-mono font-bold border border-purple-300 rounded focus:ring-1 focus:ring-purple-500"
+                                    className="w-20 px-2.5 py-1 text-right font-mono tabular-nums font-bold border border-brand-primary/30 rounded-lg"
                                   />
                                 ) : (
-                                  <span className="font-mono text-slate-400">{line.doneQty}</span>
+                                  <span className="font-mono tabular-nums text-text-muted">{line.doneQty}</span>
                                 )}
                               </td>
-                              <td className="py-2.5 px-3 text-slate-600 font-medium">{line.uom}</td>
-                              <td className="py-2.5 px-3 text-center">
+                              <td className="py-3 px-3 text-text-secondary font-medium">{line.uom}</td>
+                              <td className="py-3 px-4 text-center">
                                 {line.doneQty >= line.demandQty ? (
-                                  <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">
-                                    Fulfilled
-                                  </span>
+                                  <Badge variant="success" size="sm">Fulfilled</Badge>
                                 ) : line.doneQty > 0 ? (
-                                  <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">
-                                    Partial
-                                  </span>
+                                  <Badge variant="warning" size="sm">Partial</Badge>
                                 ) : (
-                                  <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
-                                    Pending
-                                  </span>
+                                  <Badge variant="neutral" size="sm">Pending</Badge>
                                 )}
                               </td>
                             </tr>
@@ -677,139 +634,146 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({
                 </div>
 
                 {selectedTransfer.notes && (
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-xs">
-                    <span className="font-bold text-slate-700 block mb-0.5">Notes:</span>
-                    <p className="text-slate-600">{selectedTransfer.notes}</p>
+                  <div className="p-4 bg-bg-elevated rounded-xl border border-border-subtle text-caption">
+                    <span className="font-bold text-text-secondary block mb-0.5">Notes:</span>
+                    <p className="text-text-muted">{selectedTransfer.notes}</p>
                   </div>
                 )}
               </div>
             )
           )}
         </div>
-      ) : (
-        /* LIST VIEW */
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-purple-50 text-purple-700 rounded-xl">
-                <Icon className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">{config.title}</h1>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  View and process inventory document transfers with automated stock ledger synchronization.
-                </p>
-              </div>
+      </Drawer>
+
+      {/* LIST VIEW */}
+      <div className="space-y-4">
+        {/* Header */}
+        <Card variant="default" padding="lg" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-brand-primary/10 text-brand-primary rounded-xl">
+              <Icon className="w-5 h-5" />
             </div>
-
-            <button
-              onClick={() => setIsCreating(true)}
-              className="px-4 py-2 bg-[#714B67] hover:bg-[#593952] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New {config.shortCode}</span>
-            </button>
-          </div>
-
-          {/* Search & Status Filters */}
-          <div className="bg-white p-3.5 rounded-xl shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={`Search by Reference (${config.shortCode}...), Partner or Product...`}
-                className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            {/* Status pills */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs">
-              {(['ALL', 'DRAFT', 'WAITING', 'READY', 'DONE'] as const).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-2.5 py-1 rounded-md font-semibold transition text-xs ${
-                    statusFilter === st
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {st === 'ALL' ? 'All' : st}
-                </button>
-              ))}
+            <div>
+              <h1 className="text-h2 font-extrabold text-text-primary tracking-tight">{config.title}</h1>
+              <p className="text-caption text-text-muted mt-0.5">
+                Process transfer documents with double-entry stock ledger synchronization.
+              </p>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 overflow-hidden">
+          <Button variant="primary" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCreating(true)}>
+            New {config.shortCode}
+          </Button>
+        </Card>
+
+        {/* Search & Status Filters */}
+        <Card variant="default" padding="md" className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={`Search by Reference (${config.shortCode}...), Partner or Product...`}
+              className="pl-9 pr-3"
+            />
+          </div>
+
+          {/* Status pills */}
+          <div className="flex items-center gap-1 bg-bg-elevated p-1 rounded-xl text-caption">
+            {(['ALL', 'DRAFT', 'WAITING', 'READY', 'DONE'] as const).map((st) => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3 py-1 rounded-lg font-semibold transition text-caption ${
+                  statusFilter === st
+                    ? 'bg-bg-surface text-text-primary shadow-xs font-bold'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {st === 'ALL' ? 'All' : st}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {/* Table */}
+        {filteredTransfers.length === 0 ? (
+          <EmptyState
+            title={`No ${config.title} Found`}
+            description="No transfers matched your filter criteria. Create a new transfer document or clear your search term."
+            actionLabel="Clear Filters"
+            onAction={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+          />
+        ) : (
+          <Card variant="default" padding="none" className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+              <table className="w-full text-left text-caption">
+                <thead className="bg-bg-elevated/50 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-micro">
                   <tr>
-                    <th className="py-3 px-4">Reference</th>
-                    <th className="py-3 px-3">{config.partnerLabel}</th>
-                    <th className="py-3 px-3">From Location</th>
-                    <th className="py-3 px-3">To Location</th>
-                    <th className="py-3 px-3">Scheduled Date</th>
-                    <th className="py-3 px-3 text-center">Status</th>
-                    <th className="py-3 px-4 text-center">Action</th>
+                    <th className="py-3.5 px-4">Reference</th>
+                    <th className="py-3.5 px-3">{config.partnerLabel}</th>
+                    <th className="py-3.5 px-3">From Location</th>
+                    <th className="py-3.5 px-3">To Location</th>
+                    <th className="py-3.5 px-3">Scheduled Date</th>
+                    <th className="py-3.5 px-3 text-center">Status</th>
+                    <th className="py-3.5 px-4 text-center">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredTransfers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
-                        No {config.title.toLowerCase()} found matching filters.
+                <tbody className="divide-y divide-border-subtle">
+                  {filteredTransfers.map((t) => (
+                    <tr
+                      key={t.id}
+                      onClick={() => {
+                        setSelectedTransfer(t);
+                        setIsDrawerOpen(true);
+                      }}
+                      className="hover:bg-bg-elevated/50 transition cursor-pointer"
+                    >
+                      <td className="py-3.5 px-4 font-mono font-bold text-brand-primary flex items-center gap-1.5">
+                        <span>{t.reference}</span>
+                      </td>
+                      <td className="py-3.5 px-3 font-semibold text-text-primary">
+                        {t.partnerName || '—'}
+                      </td>
+                      <td className="py-3.5 px-3 text-text-secondary">
+                        <div className="font-medium text-text-primary">{t.sourceLocation.name}</div>
+                        <span className="text-micro text-text-muted font-mono">{t.sourceLocation.code}</span>
+                      </td>
+                      <td className="py-3.5 px-3 text-text-secondary">
+                        <div className="font-medium text-emerald-800">{t.destLocation.name}</div>
+                        <span className="text-micro text-text-muted font-mono">{t.destLocation.code}</span>
+                      </td>
+                      <td className="py-3.5 px-3 text-text-muted font-mono tabular-nums text-micro">
+                        {new Date(t.scheduledDate).toLocaleDateString()}
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
+                        <StatusBadge status={t.status} />
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTransfer(t);
+                            setIsDrawerOpen(true);
+                          }}
+                        >
+                          Open Slip
+                        </Button>
                       </td>
                     </tr>
-                  ) : (
-                    filteredTransfers.map((t) => (
-                      <tr
-                        key={t.id}
-                        onClick={() => setSelectedTransfer(t)}
-                        className="hover:bg-slate-50/80 transition cursor-pointer group"
-                      >
-                        <td className="py-3 px-4 font-mono font-bold text-purple-900 flex items-center gap-1.5">
-                          <span>{t.reference}</span>
-                        </td>
-                        <td className="py-3 px-3 font-semibold text-slate-800">
-                          {t.partnerName || '—'}
-                        </td>
-                        <td className="py-3 px-3 text-slate-600">
-                          <div>{t.sourceLocation.name}</div>
-                          <span className="text-[10px] text-slate-400 font-mono">{t.sourceLocation.code}</span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-600">
-                          <div>{t.destLocation.name}</div>
-                          <span className="text-[10px] text-slate-400 font-mono">{t.destLocation.code}</span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
-                          {new Date(t.scheduledDate).toLocaleDateString()}
-                        </td>
-                        <td className="py-3 px-3 text-center">{getStatusBadge(t.status)}</td>
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTransfer(t);
-                            }}
-                            className="px-2.5 py-1 text-xs font-bold text-purple-700 bg-purple-50 group-hover:bg-purple-100 rounded transition"
-                          >
-                            Open →
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      )}
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

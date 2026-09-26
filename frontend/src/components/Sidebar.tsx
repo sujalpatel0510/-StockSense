@@ -121,8 +121,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           {/* Header Brand */}
           <div className="h-16 px-5 border-b border-slate-800/80 flex items-center justify-between">
-            <div
-              onClick={() => handleSelectTab('dashboard')}
+            <a
+              href="#/dashboard"
+              onClick={(e) => {
+                e.preventDefault();
+                handleSelectTab('dashboard');
+              }}
               className="flex items-center space-x-2.5 cursor-pointer group"
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 p-1.5 flex items-center justify-center shadow-md shadow-indigo-950/50">
@@ -137,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </span>
                 <span className="text-[10px] text-slate-400">Inventory Enterprise</span>
               </div>
-            </div>
+            </a>
 
             {/* Close Button on Mobile */}
             <button
@@ -180,9 +184,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const isActive = activeTab === item.id;
 
                   return (
-                    <button
+                    <a
                       key={item.id}
-                      onClick={() => handleSelectTab(item.id)}
+                      href={`#/${item.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleSelectTab(item.id);
+                      }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-colors duration-150 ${
                         isActive
                           ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/30'
@@ -205,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {item.badge}
                         </span>
                       )}
-                    </button>
+                    </a>
                   );
                 })}
               </div>
