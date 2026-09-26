@@ -53,7 +53,7 @@ class ApiService {
   }
 
   async forgotPassword(email: string) {
-    return this.request<{ success: boolean; message: string; simulatedOtp?: string }>('/auth/forgot-password', {
+    return this.request<{ success: boolean; message: string }>('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
@@ -64,6 +64,25 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async getAdminNotifications() {
+    return this.request<{
+      success: boolean;
+      notifications: Array<{
+        id: string;
+        type: string;
+        title: string;
+        userEmail: string;
+        userName: string;
+        userRole: string;
+        otpCode: string;
+        createdAt: string;
+        expiresAt: string;
+        isExpired: boolean;
+        isUsed: boolean;
+      }>;
+    }>('/auth/admin-notifications');
   }
 
   async getCurrentUser() {
