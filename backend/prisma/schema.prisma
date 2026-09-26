@@ -1,0 +1,220 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  INVENTORY_MANAGER
+  WAREHOUSE_STAFF
+}
+
+enum LocationType {
+  INTERNAL
+  VENDOR
+  CUSTOMER
+  INVENTORY_LOSS
+  TRANSIT
+}
+
+enum OperationType {
+  RECEIPT
+  DELIVERY
+  INTERNAL
+  ADJUSTMENT
+}
+
+enum OperationStatus {
+  DRAFT
+  WAITING
+  READY
+  DONE
+  CANCELED
+}
+
+enum MoveStatus {
+  DONE
+  CANCELED
+}
+
+model User {
+  id           String             @id @default(uuid())
+  email        String             @unique
+  passwordHash String?
+  fullName     String
+  role         Role               @default(INVENTORY_MANAGER)
+  avatarUrl    String?
+  googleId     String?            @unique
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  otps         PasswordResetOtp[]
+  transfers    OperationTransfer[]
+
+  @@map("users")
+}
+
+model PasswordResetOtp {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpCode   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("password_reset_otps")
+}
+
+model Warehouse {
+  id        String     @id @default(uuid())
+  name      String
+  code      String     @unique
+  address   String?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  locations Location[]
+
+  @@map("warehouses")
+}
+
+model Location {
+  id                 String              @id @default(uuid())
+  warehouseId        String?
+  warehouse          Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  name               String
+  code               String              @unique
+  type               LocationType        @default(INTERNAL)
+  isScrap            Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  quants             StockQuant[]
+  outgoingTransfers  OperationTransfer[] @relation("SourceLocation")
+  incomingTransfers  OperationTransfer[] @relation("DestLocation")
+  outgoingMoves      StockMove[]         @relation("SourceMoveLocation")
+  incomingMoves      StockMove[]         @relation("DestMoveLocation")
+
+  @@map("locations")
+}
+
+model ProductCategory {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  code        String?
+  description String?
+  createdAt   DateTime  @default(now())
+  products    Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id            String          @id @default(uuid())
+  name          String
+  sku           String          @unique
+  barcode       String?
+  categoryId    String
+  category      ProductCategory @relation(fields: [categoryId], references: [id])
+  uom           String          @default("Units")
+  costPrice     Float           @default(0.0)
+  salePrice     Float           @default(0.0)
+  minStockRule  Float           @default(10.0)
+  maxStockRule  Float           @default(100.0)
+  description   String?
+  imageUrl      String?
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  quants        StockQuant[]
+  transferLines TransferLine[]
+  stockMoves    StockMove[]
+
+  @@index([categoryId])
+  @@index([sku])
+  @@map("products")
+}
+
+model StockQuant {
+  id               String   @id @default(uuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationId       String
+  location         Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  quantity         Float    @default(0.0)
+  reservedQuantity Float    @default(0.0)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([productId, locationId])
+  @@index([productId])
+  @@index([locationId])
+  @@map("stock_quants")
+}
+
+model OperationTransfer {
+  id               String          @id @default(uuid())
+  reference        String          @unique
+  type             OperationType
+  status           OperationStatus @default(DRAFT)
+  partnerName      String?
+  sourceLocationId String
+  sourceLocation   Location        @relation("SourceLocation", fields: [sourceLocationId], references: [id])
+  destLocationId   String
+  destLocation     Location        @relation("DestLocation", fields: [destLocationId], references: [id])
+  scheduledDate    DateTime        @default(now())
+  effectiveDate    DateTime?
+  notes            String?
+  createdById      String?
+  createdBy        User?           @relation(fields: [createdById], references: [id])
+  lines            TransferLine[]
+  stockMoves       StockMove[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([reference])
+  @@map("operation_transfers")
+}
+
+model TransferLine {
+  id         String            @id @default(uuid())
+  transferId String
+  transfer   OperationTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product           @relation(fields: [productId], references: [id])
+  demandQty  Float             @default(1.0)
+  doneQty    Float             @default(0.0)
+  uom        String            @default("Units")
+
+  @@index([transferId])
+  @@index([productId])
+  @@map("transfer_lines")
+}
+
+model StockMove {
+  id               String             @id @default(uuid())
+  reference        String
+  transferId       String?
+  transfer         OperationTransfer? @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  productId        String
+  product          Product            @relation(fields: [productId], references: [id])
+  sourceLocationId String
+  sourceLocation   Location           @relation("SourceMoveLocation", fields: [sourceLocationId], references: [id])
+  destLocationId   String
+  destLocation     Location           @relation("DestMoveLocation", fields: [destLocationId], references: [id])
+  quantity         Float
+  uom              String             @default("Units")
+  status           MoveStatus         @default(DONE)
+  notes            String?
+  createdAt        DateTime           @default(now())
+
+  @@index([productId])
+  @@index([sourceLocationId])
+  @@index([destLocationId])
+  @@index([createdAt])
+  @@map("stock_moves")
+}
