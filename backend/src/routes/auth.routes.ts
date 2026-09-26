@@ -21,7 +21,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   fullName: z.string().min(2),
-  role: z.enum(['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF']).optional(),
+  role: z.enum(['INVENTORY_MANAGER', 'WAREHOUSE_STAFF']).optional(),
 });
 
 const loginSchema = z.object({
@@ -34,7 +34,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const parseResult = registerSchema.safeParse(req.body);
     if (!parseResult.success) {
-      res.status(400).json({ success: false, message: 'Invalid inputs', errors: parseResult.error.errors });
+      res.status(400).json({ success: false, message: 'Invalid inputs. Note: System Administrator accounts cannot be created via public registration.', errors: parseResult.error.errors });
       return;
     }
 
@@ -47,7 +47,8 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const userRole = (role as Role) || Role.INVENTORY_MANAGER;
+    // Explicitly restrict to INVENTORY_MANAGER or WAREHOUSE_STAFF
+    const userRole = (role === 'INVENTORY_MANAGER' || role === 'WAREHOUSE_STAFF') ? (role as Role) : Role.INVENTORY_MANAGER;
 
     const newUser = await prisma.user.create({
       data: {
@@ -242,13 +243,11 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       },
     });
 
-    console.log(`[AUTH] Password Reset OTP for ${user.email}: ${otpCode}`);
+    console.log(`[AUTH] Password Reset OTP generated for ${user.email}`);
 
     res.json({
       success: true,
-      message: 'OTP sent successfully! (Check simulation code)',
-      // We also return simulatedOtp for hackathon offline demo convenience
-      simulatedOtp: otpCode,
+      message: 'OTP generated successfully! It has been securely dispatched to the Administrator notification center.',
     });
   } catch (error: any) {
     console.error('Forgot password error:', error);
@@ -314,6 +313,55 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
   }
 });
 
+// GET /api/auth/admin-notifications
+// Strictly ADMIN only can inspect OTPs and auth security events
+router.get('/admin-notifications', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== Role.ADMIN) {
+      res.status(403).json({ success: false, message: 'Access denied. System Administrator privileges required.' });
+      return;
+    }
+
+    const otps = await prisma.passwordResetOtp.findMany({
+      take: 15,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    const now = new Date();
+    const notifications = otps.map((item) => ({
+      id: item.id,
+      type: 'SECURITY_OTP',
+      title: 'Password Reset OTP Requested',
+      userEmail: item.user.email,
+      userName: item.user.fullName,
+      userRole: item.user.role,
+      otpCode: item.otpCode,
+      createdAt: item.createdAt,
+      expiresAt: item.expiresAt,
+      isExpired: now > item.expiresAt,
+      isUsed: Boolean(item.usedAt),
+    }));
+
+    res.json({
+      success: true,
+      notifications,
+    });
+  } catch (error: any) {
+    console.error('Error fetching admin notifications:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch admin notifications.' });
+  }
+});
+
 // GET /api/auth/me
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   res.json({
@@ -325,12 +373,21 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
 // PUT /api/auth/profile
 router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { fullName, avatarUrl } = req.body;
+    const { fullName, avatarUrl, role } = req.body;
+
+    // Role modification is strictly restricted to System Administrators (Role.ADMIN)
+    const isAdmin = req.user?.role === Role.ADMIN;
+    if (role && !isAdmin && role !== req.user?.role) {
+      res.status(403).json({ success: false, message: 'Forbidden. Role modification is restricted exclusively to System Administrators.' });
+      return;
+    }
+
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
         ...(fullName && { fullName }),
         ...(avatarUrl !== undefined && { avatarUrl }),
+        ...(role && isAdmin && { role: role as Role }),
       },
       select: {
         id: true,

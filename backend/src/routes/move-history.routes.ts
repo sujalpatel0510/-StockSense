@@ -7,30 +7,45 @@ const router = Router();
 // GET /api/moves (Immutable Stock Ledger)
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { productId, locationId, search, limit = '100', offset = '0' } = req.query;
+    const { productId, locationId, search, limit = '100', offset = '0', warehouseId } = req.query;
 
-    const where: any = {};
+    const andConditions: any[] = [];
 
     if (productId) {
-      where.productId = String(productId);
+      andConditions.push({ productId: String(productId) });
     }
 
     if (locationId) {
-      where.OR = [
-        { sourceLocationId: String(locationId) },
-        { destLocationId: String(locationId) },
-      ];
+      andConditions.push({
+        OR: [
+          { sourceLocationId: String(locationId) },
+          { destLocationId: String(locationId) },
+        ],
+      });
+    }
+
+    if (warehouseId) {
+      andConditions.push({
+        OR: [
+          { sourceLocation: { warehouseId: String(warehouseId) } },
+          { destLocation: { warehouseId: String(warehouseId) } },
+        ],
+      });
     }
 
     if (search) {
-      where.OR = [
-        { reference: { contains: String(search), mode: 'insensitive' } },
-        { product: { name: { contains: String(search), mode: 'insensitive' } } },
-        { product: { sku: { contains: String(search), mode: 'insensitive' } } },
-        { sourceLocation: { name: { contains: String(search), mode: 'insensitive' } } },
-        { destLocation: { name: { contains: String(search), mode: 'insensitive' } } },
-      ];
+      andConditions.push({
+        OR: [
+          { reference: { contains: String(search), mode: 'insensitive' } },
+          { product: { name: { contains: String(search), mode: 'insensitive' } } },
+          { product: { sku: { contains: String(search), mode: 'insensitive' } } },
+          { sourceLocation: { name: { contains: String(search), mode: 'insensitive' } } },
+          { destLocation: { name: { contains: String(search), mode: 'insensitive' } } },
+        ],
+      });
     }
+
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const [total, moves] = await Promise.all([
       prisma.stockMove.count({ where }),

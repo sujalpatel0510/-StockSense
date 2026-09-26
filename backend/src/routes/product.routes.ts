@@ -9,7 +9,7 @@ const router = Router();
 // GET /api/products
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { search, categoryId, status } = req.query;
+    const { search, categoryId, status, warehouseId } = req.query;
 
     const whereClause: any = {
       isActive: true,
@@ -42,11 +42,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
       orderBy: { name: 'asc' },
     });
 
-    // Calculate aggregated inventory quantities for internal locations
+    // Calculate aggregated inventory quantities for internal locations (optionally scoped to warehouse)
     const enrichedProducts = products.map((prod) => {
-      const internalQuants = prod.quants.filter(
-        (q) => q.location.type === LocationType.INTERNAL
-      );
+      const internalQuants = prod.quants.filter((q) => {
+        if (q.location.type !== LocationType.INTERNAL) return false;
+        if (warehouseId && q.location.warehouseId !== String(warehouseId)) return false;
+        return true;
+      });
 
       const totalOnHand = internalQuants.reduce((acc, q) => acc + q.quantity, 0);
       const totalReserved = internalQuants.reduce((acc, q) => acc + q.reservedQuantity, 0);

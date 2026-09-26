@@ -99,6 +99,14 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response):
 
       // Recent Stock Moves for live feed
       prisma.stockMove.findMany({
+        where: warehouseId
+          ? {
+              OR: [
+                { sourceLocation: { warehouseId: String(warehouseId) } },
+                { destLocation: { warehouseId: String(warehouseId) } },
+              ],
+            }
+          : {},
         take: 8,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -119,18 +127,18 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response):
     const operationsSummary = {
       receipts: {
         toProcess: pendingReceipts,
-        total: await prisma.operationTransfer.count({ where: { type: OperationType.RECEIPT } }),
+        total: await prisma.operationTransfer.count({ where: { ...transferWhere, type: OperationType.RECEIPT } }),
       },
       deliveries: {
         toProcess: pendingDeliveries,
-        total: await prisma.operationTransfer.count({ where: { type: OperationType.DELIVERY } }),
+        total: await prisma.operationTransfer.count({ where: { ...transferWhere, type: OperationType.DELIVERY } }),
       },
       internal: {
         toProcess: internalScheduled,
-        total: await prisma.operationTransfer.count({ where: { type: OperationType.INTERNAL } }),
+        total: await prisma.operationTransfer.count({ where: { ...transferWhere, type: OperationType.INTERNAL } }),
       },
       adjustments: {
-        total: await prisma.operationTransfer.count({ where: { type: OperationType.ADJUSTMENT } }),
+        total: await prisma.operationTransfer.count({ where: { ...transferWhere, type: OperationType.ADJUSTMENT } }),
       },
     };
 

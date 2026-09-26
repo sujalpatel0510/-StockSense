@@ -107,11 +107,17 @@ router.get('/locations/all', authenticateToken, async (req: AuthRequest, res: Re
   try {
     const { type, warehouseId } = req.query;
 
+    const where: any = {};
+    if (type) where.type = type as LocationType;
+    if (warehouseId) {
+      where.OR = [
+        { warehouseId: String(warehouseId) },
+        { warehouseId: null },
+      ];
+    }
+
     const locations = await prisma.location.findMany({
-      where: {
-        ...(type && { type: type as LocationType }),
-        ...(warehouseId && { warehouseId: String(warehouseId) }),
-      },
+      where,
       include: {
         warehouse: {
           select: { id: true, name: true, code: true },
