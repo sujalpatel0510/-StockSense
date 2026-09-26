@@ -382,12 +382,15 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
       return;
     }
 
+    const isRootAdmin = req.user?.email.toLowerCase() === 'admin@stocksense.com';
+    const targetRole = isRootAdmin ? Role.ADMIN : (role && isAdmin ? (role as Role) : undefined);
+
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
         ...(fullName && { fullName }),
         ...(avatarUrl !== undefined && { avatarUrl }),
-        ...(role && isAdmin && { role: role as Role }),
+        ...(targetRole && { role: targetRole }),
       },
       select: {
         id: true,

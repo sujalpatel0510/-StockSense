@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import api from '../services/api';
 import {
   DashboardStats,
@@ -55,6 +55,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [moves, setMoves] = useState<StockMove[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const isFetchingRef = useRef(false);
 
   const adjustments = useMemo(() => 
     transfers.filter((t) => t.type === 'ADJUSTMENT'), 
@@ -72,6 +73,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const fetchAllData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setLoading(true);
     try {
       const [
@@ -84,25 +87,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         movesRes,
       ] = await Promise.all([
         api.getDashboardStats(selectedWarehouseId || undefined),
-        api.getProducts(),
+        api.getProducts({ warehouseId: selectedWarehouseId || undefined }),
         api.getCategories(),
         api.getWarehouses(),
-        api.getLocations(),
+        api.getLocations({ warehouseId: selectedWarehouseId || undefined }),
         api.getTransfers({ warehouseId: selectedWarehouseId || undefined }),
-        api.getMoves(),
+        api.getMoves({ warehouseId: selectedWarehouseId || undefined }),
       ]);
 
-      if (statsRes.success) setDashboardStats(statsRes.data);
-      if (prodRes.success) setProducts(prodRes.data);
-      if (catRes.success) setCategories(catRes.data);
-      if (whRes.success) setWarehouses(whRes.data);
-      if (locRes.success) setLocations(locRes.data);
-      if (transRes.success) setTransfers(transRes.data);
-      if (movesRes.success) setMoves(movesRes.data);
+      if (statsRes?.success) setDashboardStats(statsRes.data);
+      if (prodRes?.success) setProducts(prodRes.data);
+      if (catRes?.success) setCategories(catRes.data);
+      if (whRes?.success) setWarehouses(whRes.data);
+      if (locRes?.success) setLocations(locRes.data);
+      if (transRes?.success) setTransfers(transRes.data);
+      if (movesRes?.success) setMoves(movesRes.data);
     } catch (error) {
       console.error('Error fetching StockSense data:', error);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, [selectedWarehouseId]);
 
@@ -112,12 +116,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProducts = useCallback(async () => {
     try {
-      const res = await api.getProducts();
+      const res = await api.getProducts({ warehouseId: selectedWarehouseId || undefined });
       if (res.success) setProducts(res.data);
     } catch (error) {
       console.error('Error refreshing products:', error);
     }
-  }, []);
+  }, [selectedWarehouseId]);
 
   const refreshTransfers = useCallback(async () => {
     try {
@@ -130,19 +134,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshMoves = useCallback(async () => {
     try {
-      const res = await api.getMoves();
+      const res = await api.getMoves({ warehouseId: selectedWarehouseId || undefined });
       if (res.success) setMoves(res.data);
     } catch (error) {
       console.error('Error refreshing moves:', error);
     }
-  }, []);
+  }, [selectedWarehouseId]);
 
   const refreshDashboard = useCallback(async () => {
     try {
       const res = await api.getDashboardStats(selectedWarehouseId || undefined);
       if (res.success) setDashboardStats(res.data);
     } catch (error) {
-      console.error('Error refreshing dashboard:', error);
+      console.error('Error refreshing dashboard stats:', error);
     }
   }, [selectedWarehouseId]);
 
@@ -173,32 +177,53 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const contextValue = useMemo(() => ({
+    dashboardStats,
+    products,
+    categories,
+    warehouses,
+    locations,
+    transfers,
+    moves,
+    adjustments,
+    lowStockCount,
+    outOfStockCount,
+    loading,
+    selectedWarehouseId,
+    setSelectedWarehouseId,
+    fetchAllData,
+    refreshProducts,
+    refreshTransfers,
+    refreshMoves,
+    refreshDashboard,
+    refreshWarehouses,
+    refreshLocations,
+    refreshCategories,
+  }), [
+    dashboardStats,
+    products,
+    categories,
+    warehouses,
+    locations,
+    transfers,
+    moves,
+    adjustments,
+    lowStockCount,
+    outOfStockCount,
+    loading,
+    selectedWarehouseId,
+    fetchAllData,
+    refreshProducts,
+    refreshTransfers,
+    refreshMoves,
+    refreshDashboard,
+    refreshWarehouses,
+    refreshLocations,
+    refreshCategories,
+  ]);
+
   return (
-    <DataContext.Provider
-      value={{
-        dashboardStats,
-        products,
-        categories,
-        warehouses,
-        locations,
-        transfers,
-        moves,
-        adjustments,
-        lowStockCount,
-        outOfStockCount,
-        loading,
-        selectedWarehouseId,
-        setSelectedWarehouseId,
-        fetchAllData,
-        refreshProducts,
-        refreshTransfers,
-        refreshMoves,
-        refreshDashboard,
-        refreshWarehouses,
-        refreshLocations,
-        refreshCategories,
-      }}
-    >
+    <DataContext.Provider value={contextValue}>
       {children}
     </DataContext.Provider>
   );

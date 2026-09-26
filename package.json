@@ -1,0 +1,30 @@
+{
+  "name": "stocksense-suite",
+  "version": "1.0.0",
+  "description": "StockSense - Modular Enterprise Inventory Management System (IMS)",
+  "scripts": {
+    "dev": "concurrently -n \"API,WEB\" -c \"magenta,cyan\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "npm --prefix backend run prisma:seed",
+    "db:push": "npm --prefix backend run prisma:push",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down"
+  },
+  "keywords": [
+    "inventory-management",
+    "postgresql",
+    "prisma",
+    "react",
+    "typescript",
+    "express",
+    "erp",
+    "docker"
+  ],
+  "author": "Sujal V.",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

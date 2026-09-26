@@ -345,9 +345,14 @@ export const DashboardPage: React.FC = () => {
           <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-caption font-bold border border-emerald-500/30">
             +{totalMargin || 35}% Projected Margin
           </span>
-          <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-white/10" onClick={() => navigate('/products')}>
-            Asset Details →
-          </Button>
+          <button
+            type="button"
+            onClick={() => navigate('/products')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs tracking-wide transition-all border border-white/25 cursor-pointer shadow-sm"
+          >
+            <span>Asset Details</span>
+            <ArrowRight className="w-3.5 h-3.5 text-white" />
+          </button>
         </div>
       </Card>
 

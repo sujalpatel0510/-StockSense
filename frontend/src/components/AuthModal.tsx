@@ -14,6 +14,7 @@ import {
   Zap,
   Eye,
   EyeOff,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -29,7 +30,7 @@ export const AuthModal: React.FC = () => {
   const [email, setEmail] = useState('admin@stocksense.com');
   const [password, setPassword] = useState('admin123');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'ADMIN' | 'INVENTORY_MANAGER' | 'WAREHOUSE_STAFF'>('INVENTORY_MANAGER');
+  const [role, setRole] = useState<'INVENTORY_MANAGER' | 'WAREHOUSE_STAFF'>('INVENTORY_MANAGER');
 
   // Selected demo account indicator
   const [activeDemoRole, setActiveDemoRole] = useState<'admin' | 'manager' | 'staff' | null>('admin');
@@ -39,7 +40,7 @@ export const AuthModal: React.FC = () => {
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [simulatedOtpNotice, setSimulatedOtpNotice] = useState<string | null>(null);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   // Loading & error states
   const [loading, setLoading] = useState(false);
@@ -91,13 +92,9 @@ export const AuthModal: React.FC = () => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const res = await api.forgotPassword(forgotEmail);
+      await api.forgotPassword(forgotEmail);
       setOtpSent(true);
-      if (res.simulatedOtp) {
-        setSimulatedOtpNotice(res.simulatedOtp);
-        setOtpCode(res.simulatedOtp);
-      }
-      setSuccessMessage('OTP code generated! Check simulation preview.');
+      setSuccessMessage('OTP dispatched to the Administrator notification portal.');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to send OTP.');
     } finally {
@@ -119,7 +116,6 @@ export const AuthModal: React.FC = () => {
       setTimeout(() => {
         setIsForgotModalOpen(false);
         setOtpSent(false);
-        setSimulatedOtpNotice(null);
         setIsRegister(false);
       }, 1500);
     } catch (err: any) {
@@ -371,11 +367,10 @@ export const AuthModal: React.FC = () => {
                     <label className="label-base">Role Assignment</label>
                     <Select
                       value={role}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRole(e.target.value as 'ADMIN' | 'INVENTORY_MANAGER' | 'WAREHOUSE_STAFF')}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRole(e.target.value as 'INVENTORY_MANAGER' | 'WAREHOUSE_STAFF')}
                       options={[
                         { value: 'INVENTORY_MANAGER', label: 'Inventory Manager (Full Ops & Products)' },
                         { value: 'WAREHOUSE_STAFF', label: 'Warehouse Staff (Transfers & Picking)' },
-                        { value: 'ADMIN', label: 'System Administrator' },
                       ]}
                     />
                   </div>
@@ -426,8 +421,14 @@ export const AuthModal: React.FC = () => {
                   rightIcon={
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-text-muted hover:text-text-primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowPassword((prev) => !prev);
+                      }}
+                      className="text-text-muted hover:text-text-primary p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -461,15 +462,18 @@ export const AuthModal: React.FC = () => {
               <h3 className="font-bold text-base">OTP Password Reset</h3>
             </div>
             <p className="text-caption text-text-muted mb-4">
-              Enter your account email to receive a secure 6-digit one-time password.
+              Enter your account email. For high security, the 6-digit OTP will be dispatched exclusively to the <strong>Admin Notification Portal</strong>.
             </p>
 
-            {simulatedOtpNotice && (
-              <div className="p-3 bg-brand-primary/10 border border-brand-primary/30 rounded-xl text-brand-primary text-caption mb-3 flex items-center justify-between">
-                <span>Simulated OTP Code:</span>
-                <span className="font-mono text-body font-bold bg-brand-primary/20 px-2 py-0.5 rounded border border-brand-primary/40">
-                  {simulatedOtpNotice}
-                </span>
+            {otpSent && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-700 dark:text-amber-400 text-xs mb-3 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                  <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Admin Security Notification</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  The OTP code has been delivered exclusively to the <strong>Admin Notification Section</strong>. Please request the code from your System Administrator or check the notification bell if logged in as Admin.
+                </p>
               </div>
             )}
 
@@ -511,12 +515,28 @@ export const AuthModal: React.FC = () => {
                 <div>
                   <label className="label-base">New Password</label>
                   <Input
-                    type="password"
+                    type={showResetPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     value={newPassword}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
+                    leftIcon={<Lock className="w-4 h-4" />}
+                    rightIcon={
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowResetPassword((prev) => !prev);
+                        }}
+                        className="text-text-muted hover:text-text-primary p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                        title={showResetPassword ? 'Hide password' : 'Show password'}
+                        aria-label={showResetPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    }
                   />
                 </div>
                 <div className="flex justify-end space-x-2 pt-2">
