@@ -26,9 +26,9 @@ const sizeStyles = {
 };
 
 const positionStyles = {
-  right: 'right-0',
-  left: 'left-0',
-  bottom: 'bottom-0 left-0 right-0 max-h-[70vh]',
+  right: 'top-0 bottom-0 right-0 h-full',
+  left: 'top-0 bottom-0 left-0 h-full',
+  bottom: 'bottom-0 left-0 right-0 max-h-[85vh]',
 };
 
 const animationVariants = {
@@ -112,7 +112,7 @@ export const Drawer: React.FC<DrawerProps> = ({
         <>
           <motion.div
             ref={overlayRef}
-            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-xs"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -122,7 +122,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           <motion.div
             ref={contentRef}
             className={clsx(
-              'fixed z-50 flex flex-col bg-bg-surface border-l border-border-subtle shadow-xl',
+              'fixed z-[101] flex flex-col bg-white border-l border-border-subtle shadow-2xl',
               'h-full max-h-full overflow-hidden',
               sizeStyles[size],
               positionStyles[position],

@@ -2,7 +2,7 @@ import React from 'react';
 import { clsx } from 'clsx';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary';
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' | 'purple';
   size?: 'sm' | 'md' | 'lg';
   dot?: boolean;
   removable?: boolean;
@@ -16,6 +16,7 @@ const variantStyles = {
   info: 'bg-status-info-bg text-status-info-text border border-status-info-border',
   neutral: 'bg-status-neutral-bg text-status-neutral-text border border-status-neutral-border',
   primary: 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20',
+  purple: 'bg-purple-50 text-purple-700 border border-purple-200/80',
 };
 
 const sizeStyles = {
@@ -31,6 +32,7 @@ const dotColors = {
   info: 'bg-status-info-text',
   neutral: 'bg-status-neutral-text',
   primary: 'bg-brand-primary',
+  purple: 'bg-purple-600',
 };
 
 export const Badge: React.FC<BadgeProps> = ({

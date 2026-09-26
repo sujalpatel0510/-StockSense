@@ -84,11 +84,12 @@ class ApiService {
   }
 
   // --- Products APIs ---
-  async getProducts(params?: { search?: string; categoryId?: string; status?: string }) {
+  async getProducts(params?: { search?: string; categoryId?: string; status?: string; warehouseId?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.append('search', params.search);
     if (params?.categoryId) searchParams.append('categoryId', params.categoryId);
     if (params?.status) searchParams.append('status', params.status);
+    if (params?.warehouseId) searchParams.append('warehouseId', params.warehouseId);
     const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return this.request<{ success: boolean; data: any[] }>(`/products${qs}`);
   }
@@ -218,11 +219,12 @@ class ApiService {
   }
 
   // --- Moves APIs (Stock Ledger) ---
-  async getMoves(params?: { productId?: string; locationId?: string; search?: string }) {
+  async getMoves(params?: { productId?: string; locationId?: string; search?: string; warehouseId?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.productId) searchParams.append('productId', params.productId);
     if (params?.locationId) searchParams.append('locationId', params.locationId);
     if (params?.search) searchParams.append('search', params.search);
+    if (params?.warehouseId) searchParams.append('warehouseId', params.warehouseId);
     const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return this.request<{ success: boolean; total: number; data: any[] }>(`/moves${qs}`);
   }
