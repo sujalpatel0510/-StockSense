@@ -70,7 +70,7 @@ class ApiService {
     return this.request<{ success: boolean; user: any }>('/auth/me');
   }
 
-  async updateProfile(payload: { fullName?: string; avatarUrl?: string }) {
+  async updateProfile(payload: { fullName?: string; avatarUrl?: string; role?: string }) {
     return this.request<{ success: boolean; user: any; message: string }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(payload),
